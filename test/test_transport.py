@@ -27,8 +27,11 @@ def test_mass_transport():
     D0 = firedrake.project(D_expr, Q)
     D = D0.copy(deepcopy=True)
 
+    e = firedrake.Constant(0)
+    m = firedrake.Constant(0)
+
     model = plumes.PlumeModel()
     for step in range(num_steps):
-        model.mass_transport_solve(dt, D=D, u=u, D_inflow=D0)
+        model.mass_transport_solve(dt, D=D, u=u, e=e, m=m, D_inflow=D0)
 
     assert norm(D - D0) / norm(D0) < 1.
