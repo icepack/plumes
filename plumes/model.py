@@ -1,38 +1,48 @@
 import firedrake
-from firedrake import inner, dx
-from .physics import MassTransport, MomentumTransport
+from firedrake import (inner, outer, grad, dx, ds, dS, sqrt,
+                       min_value, max_value)
 
-class PlumeModel(object):
-    def __init__(self):
-        self.parameters = {
-            'solver_parameters': {
-                'ksp_type': 'preonly',
-                'pc_type': 'bjacobi',
-                'sub_pc_type': 'ilu'
-            }
-        }
-
-        self.mass_transport = MassTransport()
-        self.momentum_transport = MomentumTransport()
-
-    def mass_transport_solve(self, dt, D, u, e, m, D_inflow):
+class MassTransport(object):
+    def dD_dt(self, D, u, e, m, D_inflow):
         Q = D.function_space()
-        φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
-        M = φ * ψ * dx
+        φ = firedrake.TestFunction(Q)
 
-        # Explicit Euler scheme. TODO: SSPRK3
-        dD_dt = self.mass_transport.dD_dt(D, u, e, m, D_inflow)
-        F = D * φ * dx + dt * dD_dt
-        firedrake.solve(M == F, D, **self.parameters)
+        # Upwinding for stability
+        n = firedrake.FacetNormal(D.ufl_domain())
+        u_n = 0.5 * (inner(u, n) + abs(inner(u, n)))
+        f = D * u_n
 
-    def solve(self, dt, D, u, e, m, g, D_inflow, u_inflow):
-        D_n = D.copy(deepcopy=True)
-        self.mass_transport_solve(dt, D, u, e, m, D_inflow)
+        cell_flux = -inner(D * u, grad(φ)) * dx
+        face_flux = (f('+') - f('-')) * (φ('+') - φ('-')) * dS
+        flux_in = D_inflow * min_value(inner(u, n), 0) * φ * ds
+        flux_out = D * max_value(inner(u, n), 0) * φ * ds
 
+        sources = (e + m) * φ * dx
+
+        return sources - (cell_flux + face_flux + flux_in + flux_out)
+
+
+class MomentumTransport(object):
+    def __init__(self, friction=2.5e-3):
+        self.friction = friction
+
+    def du_dt(self, D, u, g, u_inflow):
         V = u.function_space()
-        v, w = firedrake.TestFunction(V), firedrake.TrialFunction(V)
-        M = D * inner(v, w) * dx
+        v = firedrake.TestFunction(V)
 
-        du_dt = self.momentum_transport.du_dt(D, u, g, u_inflow)
-        F = D_n * inner(u, v) * dx + dt * du_dt
-        firedrake.solve(M == F, u, **self.parameters)
+        mesh = V.mesh()
+        n = firedrake.FacetNormal(mesh)
+        u_n = 0.5 * (inner(u, n) + abs(inner(u, n)))
+        f = D * u * u_n
+
+        cell_flux = -inner(D * outer(u, u), grad(v)) * dx
+        face_flux = inner(f('+') - f('-'), v('+') - v('-')) * dS
+        flux_in = D * inner(u_inflow, v) * min_value(inner(u, n), 0) * ds
+        flux_out = D * inner(u, v) * max_value(inner(u, n), 0) * ds
+
+        k = self.friction
+        friction = -k * sqrt(inner(u, u)) * inner(u, v) * dx
+        gravity = D * inner(g, v) * dx
+        sources = friction + gravity
+
+        return sources - (cell_flux + face_flux + flux_in + flux_out)

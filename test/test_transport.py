@@ -34,7 +34,7 @@ def test_mass_transport():
     e = firedrake.Constant(0)
     m = firedrake.Constant(0)
 
-    model = plumes.PlumeModel()
+    model = plumes.PlumeSolver()
     for step in range(num_steps):
         model.mass_transport_solve(dt, D=D, u=u, e=e, m=m, D_inflow=D0)
 
@@ -42,7 +42,7 @@ def test_mass_transport():
 
 
 def make_initial_plume_state(Lx):
-    model = plumes.PlumeModel()
+    model = plumes.PlumeSolver()
 
     X = sympy.symbols('X')
     D_in, δD = .5, 30.
@@ -57,7 +57,7 @@ def make_parameters():
     # To calculate the density contrast, we need to know the temperature and
     # salinity of high-salinity shelf water (HSSW) and ice shelf water (ISW).
     # See Lazeroms 2018 for the values used here.
-    model = plumes.PlumeModel()
+    model = plumes.PlumeSolver()
     T_hssw, S_hssw = -1.91, 34.65
     T_isw, S_isw = -3.5, 0.
     β_T = 3.87e-5  # 1 / temperature
@@ -98,7 +98,7 @@ def make_steady_plume_inputs(D, u, **kwargs):
 
 def test_momentum_transport_steady():
     Lx, Ly = 20e3, 20e3
-    model = plumes.PlumeModel()
+    model = plumes.PlumeSolver()
 
     # Create a synthetic plume thickness and velocity.
     D_sym, u_sym = make_initial_plume_state(Lx)
@@ -217,7 +217,7 @@ def test_momentum_transport_unsteady():
         'u_inflow': u0
     }
 
-    model = plumes.PlumeModel()
+    model = plumes.PlumeSolver()
     final_time = 3 * 24 * 60 * 60
     num_steps = 2400
     dt = final_time / num_steps
