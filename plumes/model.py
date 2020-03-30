@@ -1,6 +1,7 @@
 import firedrake
 from firedrake import (inner, outer, grad, dx, ds, dS, sqrt,
                        min_value, max_value, Constant)
+from . import coefficients
 
 class MassTransport(object):
     def dD_dt(self, **kwargs):
@@ -29,7 +30,7 @@ class MassTransport(object):
 
 
 class MomentumTransport(object):
-    def __init__(self, friction=2.5e-3):
+    def __init__(self, friction=coefficients.friction):
         self.friction = friction
 
     def du_dt(self, **kwargs):
@@ -63,14 +64,19 @@ class PlumeModel(object):
     def __init__(
         self,
         mass_transport=MassTransport(),
-        momentum_transport=MomentumTransport()
+        momentum_transport=MomentumTransport(),
+        coefficients={
+            'entrainment': coefficients.entrainment
+        }
     ):
         self.mass_transport = mass_transport
         self.momentum_transport = momentum_transport
+        self.coefficients = coefficients
 
     def entrainment(self, **kwargs):
         u = kwargs['velocity']
-        z_b = kwargs['ice_shelf_draft']
+        z_b = kwargs['ice_shelf_base']
+        E_0 = self.coefficients['entrainment']
         return E_0 * inner(u, grad(z_b))
 
     def melt(self, **kwargs):

@@ -2,7 +2,7 @@ from numpy import pi as π
 import sympy
 import firedrake
 from firedrake import sqrt, inner, grad, dx, Constant, as_vector
-import plumes
+import plumes, plumes.coefficients
 
 def norm(q):
     if len(q.ufl_shape) == 0:
