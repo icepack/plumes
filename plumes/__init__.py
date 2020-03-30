@@ -1,2 +1,2 @@
-from .model import MassTransport, MomentumTransport
+from .model import MassTransport, MomentumTransport, PlumeModel
 from .solver import PlumeSolver

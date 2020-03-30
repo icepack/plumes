@@ -1,9 +1,15 @@
 import firedrake
 from firedrake import (inner, outer, grad, dx, ds, dS, sqrt,
-                       min_value, max_value)
+                       min_value, max_value, Constant)
 
 class MassTransport(object):
-    def dD_dt(self, D, u, e, m, D_inflow):
+    def dD_dt(self, **kwargs):
+        D = kwargs['thickness']
+        u = kwargs['velocity']
+        e = kwargs['entrainment']
+        m = kwargs['melt']
+        D_inflow = kwargs['thickness_inflow']
+
         Q = D.function_space()
         φ = firedrake.TestFunction(Q)
 
@@ -26,7 +32,12 @@ class MomentumTransport(object):
     def __init__(self, friction=2.5e-3):
         self.friction = friction
 
-    def du_dt(self, D, u, g, u_inflow):
+    def du_dt(self, **kwargs):
+        D = kwargs['thickness']
+        u = kwargs['velocity']
+        g = kwargs['gravity']
+        u_inflow = kwargs['velocity_inflow']
+
         V = u.function_space()
         v = firedrake.TestFunction(V)
 
@@ -46,3 +57,22 @@ class MomentumTransport(object):
         sources = friction + gravity
 
         return sources - (cell_flux + face_flux + flux_in + flux_out)
+
+
+class PlumeModel(object):
+    def __init__(
+        self,
+        mass_transport=MassTransport(),
+        momentum_transport=MomentumTransport()
+    ):
+        self.mass_transport = mass_transport
+        self.momentum_transport = momentum_transport
+
+    def entrainment(self, **kwargs):
+        u = kwargs['velocity']
+        z_b = kwargs['ice_shelf_draft']
+        return E_0 * inner(u, grad(z_b))
+
+    def melt(self, **kwargs):
+        # Miracle occurs...
+        return Constant(0.)

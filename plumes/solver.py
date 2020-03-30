@@ -1,38 +1,81 @@
 import firedrake
-from firedrake import inner, dx
+from firedrake import (
+    inner,
+    dx,
+    LinearVariationalProblem,
+    LinearVariationalSolver
+)
 from .model import MassTransport, MomentumTransport
 
+_parameters = {
+    'solver_parameters': {
+        'ksp_type': 'preonly',
+        'pc_type': 'bjacobi',
+        'sub_pc_type': 'ilu'
+    }
+}
+
 class PlumeSolver(object):
-    def __init__(self):
-        self.parameters = {
-            'solver_parameters': {
-                'ksp_type': 'preonly',
-                'pc_type': 'bjacobi',
-                'sub_pc_type': 'ilu'
-            }
+    def __init__(self, model, **kwargs):
+        self.model = model
+
+        field_names = ('thickness', 'velocity', 'temperature', 'salinity')
+        self.fields = {
+            name: kwargs[name].copy(deepcopy=True) for name in field_names
         }
 
-        self.mass_transport = MassTransport()
-        self.momentum_transport = MomentumTransport()
+        self.inflow = {
+            name + '_inflow': kwargs[name + '_inflow']
+            for name in field_names
+        }
 
-    def mass_transport_solve(self, dt, D, u, e, m, D_inflow):
+        self.inputs = {
+            'ice_shelf_base': kwargs['ice_shelf_base']
+        }
+
+        self._init_mass_solver()
+        self._init_momentum_solver()
+        self._init_temperature_solver()
+        self._init_salinity_solver()
+
+    def _init_mass_solver(self):
+        # Create the entrainment and melt rate fields as functions of the other
+        # fields and input parameters
+        e = self.model.entrainment(**self.fields, **self.inputs)
+        m = self.model.melt(**self.fields, **self.inputs)
+        sources = {'entrainment': e, 'melt': m}
+
+        # Create the finite element mass matrix
+        D = self.fields['thickness']
         Q = D.function_space()
         φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
         M = φ * ψ * dx
 
-        # Explicit Euler scheme. TODO: SSPRK3
-        dD_dt = self.mass_transport.dD_dt(D, u, e, m, D_inflow)
-        F = D * φ * dx + dt * dD_dt
-        firedrake.solve(M == F, D, **self.parameters)
+        # Create the right-hand side of the transport equation
+        transport = self.model.mass_transport
+        dD_dt = transport.dD_dt(**self.fields, **self.inflow, **sources)
 
-    def solve(self, dt, D, u, e, m, g, D_inflow, u_inflow):
-        D_n = D.copy(deepcopy=True)
-        self.mass_transport_solve(dt, D, u, e, m, D_inflow)
+        # Create a variable to store the change in thickness from one timestep
+        # to the next; this is what the solver actually computes
+        δD = firedrake.Function(Q)
+        self.thickness_change = δD
 
-        V = u.function_space()
-        v, w = firedrake.TestFunction(V), firedrake.TrialFunction(V)
-        M = D * inner(v, w) * dx
+        # Create a solver object to store
+        problem = LinearVariationalProblem(M, dD_dt, δD)
+        self.mass_solver = LinearVariationalSolver(problem, **_parameters)
 
-        du_dt = self.momentum_transport.du_dt(D, u, g, u_inflow)
-        F = D_n * inner(u, v) * dx + dt * du_dt
-        firedrake.solve(M == F, u, **self.parameters)
+    def _init_momentum_solver(self):
+        pass
+
+    def _init_temperature_solver(self):
+        pass
+
+    def _init_salinity_solver(self):
+        pass
+
+    def step(self, dt):
+        r"""Advance the solution forward by a timestep of length `dt`"""
+        D = self.fields['thickness']
+        self.mass_solver.solve()
+        δD = self.thickness_change
+        D.assign(D + dt * δD)
