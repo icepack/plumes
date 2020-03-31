@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 from numpy import pi as π
 import sympy
 import firedrake
@@ -10,11 +11,8 @@ def norm(q):
         return firedrake.assemble(abs(q) * dx)
     return firedrake.assemble(sqrt(inner(q, q)) * dx)
 
-
-def make_initial_plume_state(Lx):
+def make_initial_plume_state(Lx, D_in, δD, u_in, δu):
     X = sympy.symbols('X')
-    D_in, δD = .5, 30.
-    u_in, δu = .01, .04
     D_sym = D_in + δD * X / Lx
     u_sym = u_in + δu * X / Lx
 
@@ -59,12 +57,13 @@ def make_steady_plume_inputs(D, u):
     }
 
 
-@pytest.mark.parametrize('steady', [True, False])
-def test_momentum_transport(steady):
+def momentum_transport_run(steady, nx, ny):
     Lx, Ly = 20e3, 20e3
 
     # Create a synthetic plume thickness and velocity.
-    D_sym, u_sym = make_initial_plume_state(Lx)
+    D_in, δD = .5, 30.
+    u_in, δu = .01, .04
+    D_sym, u_sym = make_initial_plume_state(Lx, D_in, δD, u_in, δu)
 
     # Compute the slope of the ice shelf draft and melt rate that make the
     # plume thickness and velocity we just defined in steady state.
@@ -77,11 +76,10 @@ def test_momentum_transport(steady):
     z_sym = sympy.integrate(dZ_dX, (X, 0, X)) - z_in
 
     # Create a mesh and function spaces to represent the solution.
-    nx, ny = 64, 64
-    mesh = firedrake.RectangleMesh(nx, ny, Lx, Ly)
+    mesh = firedrake.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=True)
     P = firedrake.FunctionSpace(mesh, family='CG', degree=1)
-    Q = firedrake.FunctionSpace(mesh, family='DG', degree=1)
-    V = firedrake.VectorFunctionSpace(mesh, family='DG', degree=1)
+    Q = firedrake.FunctionSpace(mesh, family='DQ', degree=1)
+    V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=1)
     x = firedrake.SpatialCoordinate(mesh)
 
     # Convert the sympy expressions above into UFL expressions and project them
@@ -117,15 +115,16 @@ def test_momentum_transport(steady):
             return g
 
     if steady:
-        perturbation = Constant(0.)
+        δD = Constant(0.)
     else:
-        # The only difference between this unsteady test and the steady test is
-        # that we use a slight perturbation to the initial plume thickness in
-        # the middle of the domain and check that it gets propagated out.
-        x0 = as_vector((3 * Lx / 4, Ly / 2))
-        r = Constant(min(Lx, Ly) / 8)
-        δD = Constant(15.)
-        perturbation = δD * firedrake.max_value(0, 1 - inner(x - x0, x - x0) / r**2)
+        δD = Constant(1.)
+
+    # The only difference between this unsteady test and the steady test is
+    # that we use a slight perturbation to the initial plume thickness in
+    # the middle of the domain and check that it gets propagated out.
+    x0 = as_vector((3 * Lx / 4, Ly / 2))
+    r = Constant(min(Lx, Ly) / 8)
+    perturbation = δD * firedrake.max_value(0, 1 - inner(x - x0, x - x0) / r**2)
 
     fields = {
         'thickness': firedrake.project(D0 + perturbation, Q),
@@ -143,8 +142,9 @@ def test_momentum_transport(steady):
 
     inputs = {'ice_shelf_base': z_b}
 
-    final_time = 24 * 60 * 60
-    num_steps = 2400
+    final_time = 2 * 24 * 60 * 60
+    timestep = Lx / nx / (u_in + δu) / 48
+    num_steps = int(final_time / timestep)
     dt = final_time / num_steps
 
     model = SteadyMomentumTransportTestingModel()
@@ -153,7 +153,24 @@ def test_momentum_transport(steady):
         solver.step(dt)
 
     D = solver.fields['thickness']
-    assert norm(D - D0) / norm(D) < 1 / nx
-
     u = solver.fields['velocity']
-    assert norm(u - u0) / norm(u0) < 1 / nx
+    return norm(D - D0) / norm(D0), norm(u - u0) / norm(u0)
+
+
+@pytest.mark.parametrize('steady', [True, False])
+def test_momentum_transport(steady):
+    Ns = np.array([32, 48, 64, 72, 84, 96])
+    D_errors = np.zeros(len(Ns))
+    u_errors = np.zeros(len(Ns))
+    for k, N in enumerate(Ns):
+        D_error, u_error = momentum_transport_run(steady, N, N)
+        D_errors[k] = D_error
+        u_errors[k] = u_error
+
+    D_slope, D_intercept = np.polyfit(np.log10(1/Ns), np.log10(D_errors), 1)
+    u_slope, u_intercept = np.polyfit(np.log10(1/Ns), np.log10(u_errors), 1)
+
+    print('Thickness/velocity convergence rate: {}, {}'.format(D_slope, u_slope))
+
+    assert D_slope > 0.75
+    assert u_slope > 0.75
