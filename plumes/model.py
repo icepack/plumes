@@ -82,3 +82,8 @@ class PlumeModel(object):
     def melt(self, **kwargs):
         # Miracle occurs...
         return Constant(0.)
+
+    def gravity(self, **kwargs):
+        # Miracle occurs...
+        z_b = kwargs['ice_shelf_base']
+        return firedrake.as_vector((0., 0.))

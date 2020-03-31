@@ -60,12 +60,33 @@ class PlumeSolver(object):
         δD = firedrake.Function(Q)
         self.thickness_change = δD
 
-        # Create a solver object to store
+        # Create a solver object
         problem = LinearVariationalProblem(M, dD_dt, δD)
         self.mass_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_momentum_solver(self):
-        pass
+        # Create the momentum sources (gravity and friction) as a function of
+        # the other fields and input parameters
+        g = self.model.gravity(**self.fields, **self.inputs)
+        sources = {'gravity': g}
+
+        # Create the finite element mass matrix
+        V = self.fields['velocity'].function_space()
+        u, v = firedrake.TestFunction(V), firedrake.TrialFunction(V)
+        M = inner(u, v) * dx
+
+        # Create the right-hand side of the momentum transport equation
+        transport = self.model.momentum_transport
+        du_dt = transport.du_dt(**self.fields, **self.inflow, **sources)
+
+        # Create a variable to store the change in momentum from one timestep
+        # to the next; this is what the solver actually computes
+        δDu = firedrake.Function(V)
+        self.momentum_change = δDu
+
+        # Create a solver object
+        problem = LinearVariationalProblem(M, du_dt, δDu)
+        self.momentum_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_temperature_solver(self):
         pass
@@ -73,9 +94,19 @@ class PlumeSolver(object):
     def _init_salinity_solver(self):
         pass
 
-    def step(self, dt):
+    def step(self, timestep):
         r"""Advance the solution forward by a timestep of length `dt`"""
-        D = self.fields['thickness']
+        dt = firedrake.Constant(timestep)
+
         self.mass_solver.solve()
+        self.momentum_solver.solve()
+
+        D = self.fields['thickness']
         δD = self.thickness_change
-        D.assign(D + dt * δD)
+        D_new = D + dt * δD
+
+        u = self.fields['velocity']
+        δDu = self.momentum_change
+        u.project((D * u + dt * δDu) / D_new)
+
+        D.assign(D_new)
