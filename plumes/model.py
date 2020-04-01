@@ -64,26 +64,22 @@ class PlumeModel(object):
     def __init__(
         self,
         mass_transport=MassTransport(),
-        momentum_transport=MomentumTransport(),
-        coefficients={
-            'entrainment': coefficients.entrainment
-        }
+        momentum_transport=MomentumTransport()
     ):
         self.mass_transport = mass_transport
         self.momentum_transport = momentum_transport
-        self.coefficients = coefficients
 
     def entrainment(self, **kwargs):
         u = kwargs['velocity']
         z_b = kwargs['ice_shelf_base']
-        E_0 = self.coefficients['entrainment']
+        E_0 = coefficients.entrainment
         return E_0 * inner(u, grad(z_b))
 
-    def melt(self, **kwargs):
-        # Miracle occurs...
-        return Constant(0.)
+    def density_contrast(self, **kwargs):
+        raise NotImplementedError()
 
     def gravity(self, **kwargs):
-        # Miracle occurs...
         z_b = kwargs['ice_shelf_base']
-        return firedrake.as_vector((0., 0.))
+        δρ = self.density_contrast(**kwargs)
+        g = coefficients.gravity
+        return δρ * g * grad(z_b)

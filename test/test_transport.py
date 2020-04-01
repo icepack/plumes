@@ -30,8 +30,8 @@ def make_steady_plume_inputs(D, u):
     # See Lazeroms 2018 for the values used here.
     T_hssw, S_hssw = -1.91, 34.65
     T_isw, S_isw = -3.5, 0.
-    β_T = 3.87e-5  # 1 / temperature
-    β_S = 7.86e-4
+    β_T = plumes.coefficients.thermal_expansion
+    β_S = plumes.coefficients.haline_contraction
     δρ = β_S * (S_hssw - S_isw) - β_T * (T_hssw - T_isw)
     g = 9.81
 
@@ -44,14 +44,12 @@ def make_steady_plume_inputs(D, u):
     friction = -k * u**2
     force = flux - friction
     slope = force / (D * δρ * g)
-    gravity = δρ * g * slope
 
     entrainment = E_0 * u * slope
     melt = (D * u).diff(x) - entrainment
 
     return {
         'slope': slope,
-        'gravity': gravity,
         'entrainment': entrainment,
         'melt': melt
     }
@@ -100,19 +98,19 @@ def momentum_transport_run(steady, nx, ny):
     z_expr = sympy.lambdify(X, z_sym, modules={'log': firedrake.ln})(x[0])
     z_b = firedrake.project(z_expr, P)
 
-    g_sym = plume_inputs['gravity']
-    g_expr = sympy.lambdify(X, g_sym)(x[0])
-    g = firedrake.project(as_vector((g_expr, 0)), V)
-
-    class SteadyMomentumTransportTestingModel(plumes.PlumeModel):
+    class MomentumTransportTestingModel(plumes.PlumeModel):
         def entrainment(self, **kwargs):
             return e
 
         def melt(self, **kwargs):
             return m
 
-        def gravity(self, **kwargs):
-            return g
+        def density_contrast(self, **kwargs):
+            T_hssw, S_hssw = -1.91, 34.65
+            T_isw, S_isw = -3.5, 0.
+            β_T = plumes.coefficients.thermal_expansion
+            β_S = plumes.coefficients.haline_contraction
+            return β_S * (S_hssw - S_isw) - β_T * (T_hssw - T_isw)
 
     if steady:
         δD = Constant(0.)
@@ -147,7 +145,7 @@ def momentum_transport_run(steady, nx, ny):
     num_steps = int(final_time / timestep)
     dt = final_time / num_steps
 
-    model = SteadyMomentumTransportTestingModel()
+    model = MomentumTransportTestingModel()
     solver = plumes.PlumeSolver(model, **fields, **inflow, **inputs)
     for step in range(num_steps):
         solver.step(dt)
