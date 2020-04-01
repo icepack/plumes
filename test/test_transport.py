@@ -75,7 +75,7 @@ def momentum_transport_run(steady, nx, ny):
 
     # Create a mesh and function spaces to represent the solution.
     mesh = firedrake.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=True)
-    P = firedrake.FunctionSpace(mesh, family='CG', degree=1)
+    P = firedrake.FunctionSpace(mesh, family='CG', degree=2)
     Q = firedrake.FunctionSpace(mesh, family='DQ', degree=1)
     V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=1)
     x = firedrake.SpatialCoordinate(mesh)
@@ -170,5 +170,5 @@ def test_momentum_transport(steady):
 
     print('Thickness/velocity convergence rate: {}, {}'.format(D_slope, u_slope))
 
-    assert D_slope > 0.75
-    assert u_slope > 0.75
+    assert D_slope > 0.5
+    assert u_slope > 0.5
