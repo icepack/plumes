@@ -6,10 +6,19 @@ import firedrake
 from firedrake import sqrt, inner, grad, dx, Constant, as_vector
 import plumes, plumes.coefficients
 
+
+# For several of the synthetic test cases we use some realistic values for the
+# temperature and salinity of high-salinity shelf water (HSSW) and ice-shelf
+# water (ISW). See Lazeroms 2018 for the values used here.
+T_hssw, S_hssw = -1.91, 34.65
+T_isw, S_isw = -3.5, 0.
+
+
 def norm(q):
     if len(q.ufl_shape) == 0:
         return firedrake.assemble(abs(q) * dx)
     return firedrake.assemble(sqrt(inner(q, q)) * dx)
+
 
 def make_initial_plume_state(Lx, D_in, δD, u_in, δu):
     X = sympy.symbols('X')
@@ -25,11 +34,6 @@ def make_steady_plume_inputs(D, u):
     k = plumes.coefficients.friction
     E_0 = plumes.coefficients.entrainment
 
-    # To calculate the density contrast, we need to know the temperature and
-    # salinity of high-salinity shelf water (HSSW) and ice shelf water (ISW).
-    # See Lazeroms 2018 for the values used here.
-    T_hssw, S_hssw = -1.91, 34.65
-    T_isw, S_isw = -3.5, 0.
     β_T = plumes.coefficients.thermal_expansion
     β_S = plumes.coefficients.haline_contraction
     δρ = β_S * (S_hssw - S_isw) - β_T * (T_hssw - T_isw)
@@ -106,8 +110,6 @@ def momentum_transport_run(steady, nx, ny):
             return m
 
         def density_contrast(self, **kwargs):
-            T_hssw, S_hssw = -1.91, 34.65
-            T_isw, S_isw = -3.5, 0.
             β_T = plumes.coefficients.thermal_expansion
             β_S = plumes.coefficients.haline_contraction
             return β_S * (S_hssw - S_isw) - β_T * (T_hssw - T_isw)
@@ -138,7 +140,11 @@ def momentum_transport_run(steady, nx, ny):
         'salinity_inflow': firedrake.Function(Q)
     }
 
-    inputs = {'ice_shelf_base': z_b}
+    inputs = {
+        'ice_shelf_base': z_b,
+        'salinity_ambient': S_hssw,
+        'temperature_ambient': T_hssw
+    }
 
     final_time = 2 * 24 * 60 * 60
     timestep = Lx / nx / (u_in + δu) / 48
@@ -172,3 +178,100 @@ def test_momentum_transport(steady):
 
     assert D_slope > 0.5
     assert u_slope > 0.5
+
+
+def salt_transport_run(nx, ny):
+    Lx, Ly = 20e3, 20e3
+
+    D_in, δD = .5, 30.
+    u_in, δu = .01, .04
+    D_sym, u_sym = make_initial_plume_state(Lx, D_in, δD, u_in, δu)
+
+    plume_inputs = make_steady_plume_inputs(D_sym, u_sym)
+
+    dZ_dX = plume_inputs['slope']
+    z_in = -100.
+    X = list(D_sym.free_symbols)[0]
+    z_sym = sympy.integrate(dZ_dX, (X, 0, X)) - z_in
+
+    mesh = firedrake.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=True)
+    P = firedrake.FunctionSpace(mesh, family='CG', degree=2)
+    Q = firedrake.FunctionSpace(mesh, family='DQ', degree=1)
+    V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=1)
+    x = firedrake.SpatialCoordinate(mesh)
+
+    D0 = firedrake.project(sympy.lambdify(X, D_sym)(x[0]), Q)
+    S0 = firedrake.project(firedrake.Constant(S_isw), Q)
+    T0 = firedrake.project(firedrake.Constant(T_isw), Q)
+    u0 = firedrake.project(as_vector((sympy.lambdify(X, u_sym)(x[0]), 0)), V)
+
+    m_sym = plume_inputs['melt']
+    m = firedrake.project(sympy.lambdify(X, m_sym)(x[0]), Q)
+    E_0 = plumes.coefficients.entrainment
+    e_sym = plume_inputs['entrainment']
+    e = firedrake.project(sympy.lambdify(X, e_sym)(x[0]), Q)
+
+    z_expr = sympy.lambdify(X, z_sym, modules={'log': firedrake.ln})(x[0])
+    z_b = firedrake.project(z_expr, P)
+
+    fields = {
+        'thickness': D0,
+        'velocity': u0,
+        'temperature': T0,
+        'salinity': S0
+    }
+
+    inflow = {
+        'thickness_inflow': D0,
+        'velocity_inflow': u0,
+        'temperature_inflow': T0,
+        'salinity_inflow': S0
+    }
+
+    inputs = {
+        'ice_shelf_base': z_b,
+        'salinity_ambient': S_hssw,
+        'temperature_ambient': T_hssw
+    }
+
+    final_time = 2 * 24 * 60 * 60
+    timestep = Lx / nx / (u_in + δu) / 48
+    num_steps = int(final_time / timestep)
+    dt = final_time / num_steps
+
+    model = plumes.PlumeModel()
+    class SaltTransportTestingSolver(plumes.PlumeSolver):
+        def __init__(self, model, **kwargs):
+            super(SaltTransportTestingSolver, self).__init__(model, **kwargs)
+
+        def step(self, dt):
+            dt = firedrake.Constant(timestep)
+
+            self.mass_solver.solve()
+            D = self.fields['thickness']
+            δD = self.thickness_change
+            D_new = D + dt * δD
+
+            self.salt_solver.solve()
+            S = self.fields['salinity']
+            δDS = self.salinity_change
+            S.project((D * S + dt * δDS) / D_new)
+
+            D.assign(D_new)
+
+    solver = SaltTransportTestingSolver(model, **fields, **inflow, **inputs)
+    for step in range(num_steps):
+        if step % 50 == 0:
+            S = solver.fields['salinity']
+            print('    {} {}'.format(S.dat.data_ro.min(), S.dat.data_ro.max()))
+        solver.step(dt)
+
+    S = solver.fields['salinity']
+    return S.dat.data_ro.min(), S.dat.data_ro.max()
+
+
+def test_salt_transport():
+    Ns = np.array([32, 48, 64, 72, 84, 96])
+    for n in Ns:
+        s_min, s_max = salt_transport_run(n, n)
+        print(s_min, s_max)

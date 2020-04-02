@@ -30,7 +30,9 @@ class PlumeSolver(object):
         }
 
         self.inputs = {
-            'ice_shelf_base': kwargs['ice_shelf_base']
+            'ice_shelf_base': kwargs['ice_shelf_base'],
+            'salinity_ambient': kwargs['salinity_ambient'],
+            'temperature_ambient': kwargs['temperature_ambient']
         }
 
         self._init_mass_solver()
@@ -92,7 +94,24 @@ class PlumeSolver(object):
         pass
 
     def _init_salinity_solver(self):
-        pass
+        e = self.model.entrainment(**self.fields, **self.inputs)
+        S_a = self.inputs['salinity_ambient']
+        sources = {'entrainment': e, 'salinity_ambient': S_a}
+
+        S = self.fields['salinity']
+        Q = S.function_space()
+        φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
+        M = φ * ψ * dx
+
+        # Create the right-hand side of the transport equation
+        transport = self.model.salt_transport
+        dS_dt = transport.dS_dt(**self.fields, **self.inflow, **sources)
+
+        δDS = firedrake.Function(Q)
+        self.salinity_change = δDS
+
+        problem = LinearVariationalProblem(M, dS_dt, δDS)
+        self.salt_solver = LinearVariationalSolver(problem, **_parameters)
 
     def step(self, timestep):
         r"""Advance the solution forward by a timestep of length `dt`"""
@@ -100,6 +119,7 @@ class PlumeSolver(object):
 
         self.mass_solver.solve()
         self.momentum_solver.solve()
+        self.salt_solver.solve()
 
         D = self.fields['thickness']
         δD = self.thickness_change
@@ -107,6 +127,12 @@ class PlumeSolver(object):
 
         u = self.fields['velocity']
         δDu = self.momentum_change
+        # TODO: make a projector object to do this
         u.project((D * u + dt * δDu) / D_new)
+
+        S = self.fields['salinity']
+        δDS = self.salinity_change
+        # TODO: make a projector object to do this
+        S.project((D * S + dt * δDS) / D_new)
 
         D.assign(D_new)
