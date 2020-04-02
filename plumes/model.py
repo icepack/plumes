@@ -119,6 +119,8 @@ class PlumeModel(object):
         T = kwargs['temperature']
         u = kwargs['velocity']
 
+        # We use the simplified turbulent heat exchange parameterization from
+        # Lazeroms et al. 2018, equation 6a). See also Jenkins et al. 2010.
         Γ_TS = coefficients.turbulent_transfer
         k = coefficients.friction
         L = coefficients.latent_heat
