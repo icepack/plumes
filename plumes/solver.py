@@ -91,7 +91,30 @@ class PlumeSolver(object):
         self.momentum_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_temperature_solver(self):
-        pass
+        e = self.model.entrainment(**self.fields, **self.inputs)
+        m = self.model.melt(**self.fields, **self.inputs)
+        T_f = self.model.freezing_temperature(**self.fields, **self.inputs)
+        T_a = self.inputs['temperature_ambient']
+        sources = {
+            'entrainment': e,
+            'melt': m,
+            'temperature_ambient': T_a,
+            'freezing_temperature': T_f
+        }
+
+        T = self.fields['temperature']
+        Q = T.function_space()
+        φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
+        M = φ * ψ * dx
+
+        transport = self.model.heat_transport
+        dT_dt = transport.dT_dt(**self.fields, **self.inflow, **sources)
+
+        δDT = firedrake.Function(Q)
+        self.temperature_change = δDT
+
+        problem = LinearVariationalProblem(M, dT_dt, δDT)
+        self.heat_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_salinity_solver(self):
         e = self.model.entrainment(**self.fields, **self.inputs)
@@ -120,19 +143,23 @@ class PlumeSolver(object):
         self.mass_solver.solve()
         self.momentum_solver.solve()
         self.salt_solver.solve()
+        self.heat_solver.solve()
 
         D = self.fields['thickness']
         δD = self.thickness_change
         D_new = D + dt * δD
 
+        # TODO: Make projector objects for all of these operations
         u = self.fields['velocity']
         δDu = self.momentum_change
-        # TODO: make a projector object to do this
         u.project((D * u + dt * δDu) / D_new)
 
         S = self.fields['salinity']
         δDS = self.salinity_change
-        # TODO: make a projector object to do this
         S.project((D * S + dt * δDS) / D_new)
+
+        T = self.fields['temperature']
+        δDT = self.temperature_change
+        T.project((D * T + dt * δDT) / D_new)
 
         D.assign(D_new)
