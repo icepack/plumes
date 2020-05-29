@@ -1,3 +1,6 @@
+r"""Coefficients and physical constants
+
+See Table 1 in Lazeroms 2018"""
 
 #: Coefficient for buoyant entrainment of ambient ocean into meltwater plume
 entrainment = 0.036
@@ -8,8 +11,11 @@ friction = 2.5e-3
 #: Acceleration due to gravity (m / s^2)
 gravity = 9.81
 
-#: Turbulent heat exchange coefficient between plume and ice base
-turbulent_transfer = 6e-3
+#: Effective thermohaline exchange coefficient (sqrt(k) * Γ_TS in Lazeroms)
+effective_heat_exchange = 6e-4
+
+#: Turbulent heat transfer coefficient (sqrt(k) * Γ_T in Lazeroms)
+turbulent_heat_exchange = 1.1e-3
 
 
 #: Latent heat of melting of ice (kJ / kg)

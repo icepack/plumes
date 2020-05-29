@@ -52,6 +52,8 @@ class MomentumTransport(object):
         flux_in = D * inner(u_inflow, v) * min_value(inner(u, n), 0) * ds
         flux_out = D * inner(u, v) * max_value(inner(u, n), 0) * ds
 
+        # This term is very stiff, we should try splitting and doing it
+        # implicitly.
         k = self.friction
         friction = -k * sqrt(inner(u, u)) * inner(u, v) * dx
         gravity = D * inner(g, v) * dx
@@ -121,8 +123,7 @@ class PlumeModel(object):
 
         # We use the simplified turbulent heat exchange parameterization from
         # Lazeroms et al. 2018, equation 6a). See also Jenkins et al. 2010.
-        Γ_TS = coefficients.turbulent_transfer
-        k = coefficients.friction
+        Γ_TS = coefficients.effective_heat_exchange
         L = coefficients.latent_heat
         C_W = coefficients.ocean_heat_capacity
         C_I = coefficients.ice_heat_capacity
@@ -131,7 +132,7 @@ class PlumeModel(object):
         U = sqrt(inner(u, u))
         T_f = self.freezing_temperature(**kwargs)
         dT = T - T_f
-        return firedrake.sqrt(k) * C_W * Γ_TS * U * dT / (L + C_I * dT)
+        return C_W * Γ_TS * U * dT / (L + C_I * T_f)
 
     def density_contrast(self, **kwargs):
         T = kwargs['temperature']
