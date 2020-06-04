@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-from numpy import pi as π
 import sympy
 import firedrake
 from firedrake import sqrt, inner, grad, dx, Constant, as_vector
@@ -128,7 +127,7 @@ def momentum_transport_run(steady, nx, ny):
 
     fields = {
         'thickness': firedrake.project(D0 + perturbation, Q),
-        'velocity': u0,
+        'velocity': u0.copy(deepcopy=True),
         'temperature': firedrake.Function(Q),
         'salinity': firedrake.Function(Q)
     }
@@ -215,10 +214,10 @@ def salt_transport_run(nx, ny):
     z_b = firedrake.project(z_expr, P)
 
     fields = {
-        'thickness': D0,
-        'velocity': u0,
-        'temperature': T0,
-        'salinity': S0
+        'thickness': D0.copy(deepcopy=True),
+        'velocity': u0.copy(deepcopy=True),
+        'temperature': T0.copy(deepcopy=True),
+        'salinity': S0.copy(deepcopy=True)
     }
 
     inflow = {
@@ -312,10 +311,10 @@ def heat_transport_run(nx, ny):
     z_b = firedrake.project(z_expr, P)
 
     fields = {
-        'thickness': D0,
-        'velocity': u0,
-        'temperature': T0,
-        'salinity': S0
+        'thickness': D0.copy(deepcopy=True),
+        'velocity': u0.copy(deepcopy=True),
+        'temperature': T0.copy(deepcopy=True),
+        'salinity': S0.copy(deepcopy=True)
     }
 
     inflow = {
