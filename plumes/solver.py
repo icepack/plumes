@@ -1,3 +1,4 @@
+from enum import Flag, auto
 import firedrake
 from firedrake import (
     inner,
@@ -15,9 +16,19 @@ _parameters = {
     }
 }
 
+
+class Component(Flag):
+    Mass = auto()
+    Momentum = auto()
+    Heat = auto()
+    Salt = auto()
+    All = Mass | Momentum | Heat | Salt
+
+
 class PlumeSolver(object):
-    def __init__(self, model, **kwargs):
+    def __init__(self, model, components=Component.All, **kwargs):
         self.model = model
+        self.components = components
 
         field_names = ('thickness', 'velocity', 'temperature', 'salinity')
         self.fields = {
@@ -140,26 +151,36 @@ class PlumeSolver(object):
         r"""Advance the solution forward by a timestep of length `dt`"""
         dt = firedrake.Constant(timestep)
 
-        self.mass_solver.solve()
-        self.momentum_solver.solve()
-        self.salt_solver.solve()
-        self.heat_solver.solve()
+        if self.components & Component.Mass:
+            self.mass_solver.solve()
+
+        if self.components & Component.Momentum:
+            self.momentum_solver.solve()
+
+        if self.components & Component.Salt:
+            self.salt_solver.solve()
+
+        if self.components & Component.Heat:
+            self.heat_solver.solve()
 
         D = self.fields['thickness']
         δD = self.thickness_change
         D_new = D + dt * δD
 
-        # TODO: Make projector objects for all of these operations
-        u = self.fields['velocity']
-        δDu = self.momentum_change
-        u.project((D * u + dt * δDu) / D_new)
+        if self.components & Component.Momentum:
+            # TODO: Make projector objects for all of these operations
+            u = self.fields['velocity']
+            δDu = self.momentum_change
+            u.project((D * u + dt * δDu) / D_new)
 
-        S = self.fields['salinity']
-        δDS = self.salinity_change
-        S.project((D * S + dt * δDS) / D_new)
+        if self.components & Component.Salt:
+            S = self.fields['salinity']
+            δDS = self.salinity_change
+            S.project((D * S + dt * δDS) / D_new)
 
-        T = self.fields['temperature']
-        δDT = self.temperature_change
-        T.project((D * T + dt * δDT) / D_new)
+        if self.components & Component.Heat:
+            T = self.fields['temperature']
+            δDT = self.temperature_change
+            T.project((D * T + dt * δDT) / D_new)
 
         D.assign(D_new)
