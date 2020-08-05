@@ -4,11 +4,9 @@ from firedrake import (inner, outer, grad, dx, ds, dS, sqrt,
 from . import coefficients
 
 class MassTransport(object):
-    def dD_dt(self, **kwargs):
+    def flux(self, **kwargs):
         D = kwargs['thickness']
         u = kwargs['velocity']
-        e = kwargs['entrainment']
-        m = kwargs['melt']
         D_inflow = kwargs['thickness_inflow']
 
         Q = D.function_space()
@@ -24,19 +22,29 @@ class MassTransport(object):
         flux_in = D_inflow * min_value(inner(u, n), 0) * φ * ds
         flux_out = D * max_value(inner(u, n), 0) * φ * ds
 
-        sources = (e + m) * φ * dx
+        return cell_flux + face_flux + flux_in + flux_out
 
-        return sources - (cell_flux + face_flux + flux_in + flux_out)
+    def sources(self, **kwargs):
+        D = kwargs['thickness']
+        e = kwargs['entrainment']
+        m = kwargs['melt']
+
+        Q = D.function_space()
+        φ = firedrake.TestFunction(Q)
+
+        return (e + m) * φ * dx
+
+    def dD_dt(self, **kwargs):
+        return self.sources(**kwargs) - self.flux(**kwargs)
 
 
 class MomentumTransport(object):
     def __init__(self, friction=coefficients.friction):
         self.friction = friction
 
-    def du_dt(self, **kwargs):
+    def flux(self, **kwargs):
         D = kwargs['thickness']
         u = kwargs['velocity']
-        g = kwargs['gravity']
         u_inflow = kwargs['velocity_inflow']
 
         V = u.function_space()
@@ -52,34 +60,41 @@ class MomentumTransport(object):
         flux_in = D * inner(u_inflow, v) * min_value(inner(u, n), 0) * ds
         flux_out = D * inner(u, v) * max_value(inner(u, n), 0) * ds
 
-        # This term is very stiff, we should try splitting and doing it
-        # implicitly.
-        k = self.friction
-        friction = -k * sqrt(inner(u, u)) * inner(u, v) * dx
-        gravity = D * inner(g, v) * dx
-        sources = friction + gravity
+        return cell_flux + face_flux + flux_in + flux_out
 
-        return sources - (cell_flux + face_flux + flux_in + flux_out)
+    def sources(self, **kwargs):
+        D = kwargs['thickness']
+        u = kwargs['velocity']
+        g = kwargs['gravity']
+
+        V = u.function_space()
+        v = firedrake.TestFunction(V)
+
+        return D * inner(g, v) * dx
+
+    def sinks(self, **kwargs):
+        u = kwargs['velocity']
+        V = u.function_space()
+        v = firedrake.TestFunction(V)
+
+        k = self.friction
+        return k * sqrt(inner(u, u)) * inner(u, v) * dx
+
+    def du_dt(self, **kwargs):
+        return self.sources(**kwargs) - self.sinks(**kwargs) - self.flux(**kwargs)
 
 
 class HeatTransport(object):
     def __init__(self, friction=coefficients.friction):
         self.friction = friction
 
-    def dT_dt(self, **kwargs):
+    def flux(self, **kwargs):
         D = kwargs['thickness']
         T = kwargs['temperature']
         u = kwargs['velocity']
 
-        Γ_T = coefficients.turbulent_heat_exchange
-
         D_inflow = kwargs['thickness_inflow']
         T_inflow = kwargs['temperature_inflow']
-
-        e = kwargs['entrainment']
-        T_a = kwargs['temperature_ambient']
-        m = kwargs['melt']
-        T_f = kwargs['freezing_temperature']
 
         Q = T.function_space()
         φ = firedrake.TestFunction(Q)
@@ -94,24 +109,45 @@ class HeatTransport(object):
         flux_in = D_inflow * T_inflow * min_value(inner(u, n), 0) * φ * ds
         flux_out = D * T * max_value(inner(u, n), 0) * φ * ds
 
-        exchange = (e * T_a + m * T_f) * φ * dx
-        friction = -Γ_T * sqrt(inner(u, u)) * (T - T_f) * φ * dx
-        sources = exchange + friction
+        return cell_flux + face_flux + flux_in + flux_out
 
-        return sources - (cell_flux + face_flux + flux_in + flux_out)
+    def sources(self, **kwargs):
+        T = kwargs['temperature']
+
+        e = kwargs['entrainment']
+        T_a = kwargs['temperature_ambient']
+        m = kwargs['melt']
+        T_f = kwargs['freezing_temperature']
+
+        Q = T.function_space()
+        φ = firedrake.TestFunction(Q)
+
+        return (e * T_a + m * T_f) * φ * dx
+
+    def sinks(self, **kwargs):
+        T = kwargs['temperature']
+        u = kwargs['velocity']
+
+        Γ_T = coefficients.turbulent_heat_exchange
+        T_f = kwargs['freezing_temperature']
+
+        Q = T.function_space()
+        φ = firedrake.TestFunction(Q)
+
+        return Γ_T * sqrt(inner(u, u)) * (T - T_f) * φ * dx
+
+    def dT_dt(self, **kwargs):
+        return self.sources(**kwargs) - self.sinks(**kwargs) - self.flux(**kwargs)
 
 
 class SaltTransport(object):
-    def dS_dt(self, **kwargs):
+    def flux(self, **kwargs):
         D = kwargs['thickness']
         S = kwargs['salinity']
         u = kwargs['velocity']
 
         D_inflow = kwargs['thickness_inflow']
         S_inflow = kwargs['salinity_inflow']
-
-        e = kwargs['entrainment']
-        S_a = kwargs['salinity_ambient']
 
         Q = S.function_space()
         φ = firedrake.TestFunction(Q)
@@ -126,9 +162,20 @@ class SaltTransport(object):
         flux_in = D_inflow * S_inflow * min_value(inner(u, n), 0) * φ * ds
         flux_out = D * S * max_value(inner(u, n), 0) * φ * ds
 
-        sources = e * S_a * φ * dx
+        return cell_flux + face_flux + flux_in + flux_out
 
-        return sources - (cell_flux + face_flux + flux_in + flux_out)
+    def sources(self, **kwargs):
+        S = kwargs['salinity']
+        e = kwargs['entrainment']
+        S_a = kwargs['salinity_ambient']
+
+        Q = S.function_space()
+        φ = firedrake.TestFunction(Q)
+
+        return e * S_a * φ * dx
+
+    def dS_dt(self, **kwargs):
+        return self.sources(**kwargs) - self.flux(**kwargs)
 
 
 class PlumeModel(object):
