@@ -1,0 +1,38 @@
+version: 2.1
+
+commands:
+  build:
+    steps:
+      - checkout
+      - run: pip3 install --editable .
+      - run: pip3 install pytest-cov codecov
+  test:
+    steps:
+      - run: pytest --capture=no --verbose --cov=plumes
+  codecov:
+    steps:
+      - run: codecov
+
+jobs:
+  python36:
+    docker:
+      - image: icepack/firedrake-python3.6:0.4.1
+    working_directory: ~/plumes
+    steps:
+      - build
+      - test
+  python38:
+    docker:
+      - image: icepack/firedrake-python3.8:0.4.1
+    working_directory: ~/plumes
+    steps:
+      - build
+      - test
+      - codecov
+
+workflows:
+  version: 2
+  tests:
+    jobs:
+      - python36
+      - python38
