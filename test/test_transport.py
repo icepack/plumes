@@ -1,4 +1,5 @@
 import pytest
+import tqdm
 import numpy as np
 import sympy
 import firedrake
@@ -152,7 +153,7 @@ def momentum_transport_run(steady, nx, ny):
 
     model = MomentumTransportTestingModel()
     solver = plumes.PlumeSolver(model, **fields, **inflow, **inputs)
-    for step in range(num_steps):
+    for step in tqdm.trange(num_steps):
         solver.step(dt)
 
     D = solver.fields['thickness']
@@ -241,13 +242,13 @@ def material_transport_run(component, nx, ny):
     model = plumes.PlumeModel()
     components = plumes.Component.Mass | component
     solver = plumes.PlumeSolver(model, components, **fields, **inflow, **inputs)
-    name = {plumes.Component.Salt: 'salinity', plumes.Component.Heat: 'temperature'}
-    for step in range(num_steps):
-        if step % 50 == 0:
-            q = solver.fields[name[component]]
-            print('    {} {}'.format(q.dat.data_ro.min(), q.dat.data_ro.max()))
+    for step in tqdm.trange(num_steps):
         solver.step(dt)
 
+    name = {
+        plumes.Component.Salt: 'salinity',
+        plumes.Component.Heat: 'temperature'
+    }
     q = solver.fields[name[component]]
     return q.dat.data_ro.min(), q.dat.data_ro.max()
 
@@ -256,11 +257,11 @@ def test_salt_transport():
     Ns = np.array([32, 48, 64, 72, 84, 96])
     for n in Ns:
         s_min, s_max = material_transport_run(plumes.Component.Salt, n, n)
-        print(s_min, s_max)
+        print('Salinity min, max: {}, {}'.format(s_min, s_max))
 
 
 def test_heat_transport():
     Ns = np.array([32, 48, 64, 72, 84, 96])
     for n in Ns:
         T_min, T_max = material_transport_run(plumes.Component.Heat, n, n)
-        print(T_min, T_max)
+        print('Temperature min, max: {}, {}'.format(T_min, T_max))

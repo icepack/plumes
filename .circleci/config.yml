@@ -4,7 +4,7 @@ commands:
   build:
     steps:
       - checkout
-      - run: pip3 install --editable .
+      - run: pip3 install --editable ."[doc]"
       - run: pip3 install pytest-cov codecov
   test:
     steps:

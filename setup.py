@@ -11,6 +11,6 @@ setup(
     install_requires=['numpy', 'scipy', 'firedrake'],
     extras_require={
         'doc': ['sphinx', 'sphinxcontrib-bibtex', 'sphinx_rtd_theme',
-                'ipykernel', 'nbconvert', 'matplotlib']
+                'ipykernel', 'nbconvert', 'matplotlib', 'tqdm']
     }
 )
