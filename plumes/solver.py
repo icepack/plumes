@@ -46,6 +46,13 @@ class PlumeSolver(object):
             'temperature_ambient': kwargs['temperature_ambient']
         }
 
+        self._thickness_next = self.fields['thickness'].copy(deepcopy=True)
+        self._velocity_next = self.fields['velocity'].copy(deepcopy=True)
+        self._temperature_next = self.fields['temperature'].copy(deepcopy=True)
+        self._salinity_next = self.fields['salinity'].copy(deepcopy=True)
+
+        self._timestep = firedrake.Constant(1.)
+
         self._init_mass_solver()
         self._init_momentum_solver()
         self._init_temperature_solver()
@@ -62,19 +69,18 @@ class PlumeSolver(object):
         D = self.fields['thickness']
         Q = D.function_space()
         φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
-        M = φ * ψ * dx
+        mass = φ * ψ * dx
 
         # Create the right-hand side of the transport equation
         transport = self.model.mass_transport
         dD_dt = transport.dD_dt(**self.fields, **self.inflow, **sources)
 
-        # Create a variable to store the change in thickness from one timestep
-        # to the next; this is what the solver actually computes
-        δD = firedrake.Function(Q)
-        self.thickness_change = δD
+        dt = self._timestep
+        rhs = D * φ * dx + dt * dD_dt
 
         # Create a solver object
-        problem = LinearVariationalProblem(M, dD_dt, δD)
+        D_next = self._thickness_next
+        problem = LinearVariationalProblem(mass, rhs, D_next)
         self.mass_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_momentum_solver(self):
@@ -83,22 +89,25 @@ class PlumeSolver(object):
         g = self.model.gravity(**self.fields, **self.inputs)
         sources = {'gravity': g}
 
+        u = self.fields['velocity']
+        D = self.fields['thickness']
+        D_next = self._thickness_next
+
         # Create the finite element mass matrix
-        V = self.fields['velocity'].function_space()
-        u, v = firedrake.TestFunction(V), firedrake.TrialFunction(V)
-        M = inner(u, v) * dx
+        V = u.function_space()
+        v, w = firedrake.TestFunction(V), firedrake.TrialFunction(V)
+        mass = D_next * inner(v, w) * dx
 
         # Create the right-hand side of the momentum transport equation
         transport = self.model.momentum_transport
         du_dt = transport.du_dt(**self.fields, **self.inflow, **sources)
 
-        # Create a variable to store the change in momentum from one timestep
-        # to the next; this is what the solver actually computes
-        δDu = firedrake.Function(V)
-        self.momentum_change = δDu
+        dt = self._timestep
+        rhs = D * inner(u, v) * dx + dt * du_dt
 
         # Create a solver object
-        problem = LinearVariationalProblem(M, du_dt, δDu)
+        u_next = self._velocity_next
+        problem = LinearVariationalProblem(mass, rhs, u_next)
         self.momentum_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_temperature_solver(self):
@@ -114,17 +123,21 @@ class PlumeSolver(object):
         }
 
         T = self.fields['temperature']
+        D = self.fields['thickness']
+        D_next = self._thickness_next
+
         Q = T.function_space()
         φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
-        M = φ * ψ * dx
+        mass = D_next * φ * ψ * dx
 
         transport = self.model.heat_transport
         dT_dt = transport.dT_dt(**self.fields, **self.inflow, **sources)
 
-        δDT = firedrake.Function(Q)
-        self.temperature_change = δDT
+        dt = self._timestep
+        rhs = D * T * φ * dx + dt * dT_dt
 
-        problem = LinearVariationalProblem(M, dT_dt, δDT)
+        T_next = self._temperature_next
+        problem = LinearVariationalProblem(mass, rhs, T_next)
         self.heat_solver = LinearVariationalSolver(problem, **_parameters)
 
     def _init_salinity_solver(self):
@@ -133,23 +146,28 @@ class PlumeSolver(object):
         sources = {'entrainment': e, 'salinity_ambient': S_a}
 
         S = self.fields['salinity']
+        D = self.fields['thickness']
+        D_next = self._thickness_next
+
         Q = S.function_space()
         φ, ψ = firedrake.TestFunction(Q), firedrake.TrialFunction(Q)
-        M = φ * ψ * dx
+        mass = D_next * φ * ψ * dx
 
         # Create the right-hand side of the transport equation
         transport = self.model.salt_transport
         dS_dt = transport.dS_dt(**self.fields, **self.inflow, **sources)
 
-        δDS = firedrake.Function(Q)
-        self.salinity_change = δDS
+        dt = self._timestep
+        rhs = D * S * φ * dx + dt * dS_dt
 
-        problem = LinearVariationalProblem(M, dS_dt, δDS)
+        S_next = self._salinity_next
+        problem = LinearVariationalProblem(mass, rhs, S_next)
         self.salt_solver = LinearVariationalSolver(problem, **_parameters)
 
     def step(self, timestep):
         r"""Advance the solution forward by a timestep of length `dt`"""
-        dt = firedrake.Constant(timestep)
+        dt = self._timestep
+        dt.assign(timestep)
 
         if self.components & Component.Mass:
             self.mass_solver.solve()
@@ -163,24 +181,7 @@ class PlumeSolver(object):
         if self.components & Component.Heat:
             self.heat_solver.solve()
 
-        D = self.fields['thickness']
-        δD = self.thickness_change
-        D_new = D + dt * δD
-
-        if self.components & Component.Momentum:
-            # TODO: Make projector objects for all of these operations
-            u = self.fields['velocity']
-            δDu = self.momentum_change
-            u.project((D * u + dt * δDu) / D_new)
-
-        if self.components & Component.Salt:
-            S = self.fields['salinity']
-            δDS = self.salinity_change
-            S.project((D * S + dt * δDS) / D_new)
-
-        if self.components & Component.Heat:
-            T = self.fields['temperature']
-            δDT = self.temperature_change
-            T.project((D * T + dt * δDT) / D_new)
-
-        D.assign(D_new)
+        self.fields['thickness'].assign(self._thickness_next)
+        self.fields['velocity'].assign(self._velocity_next)
+        self.fields['temperature'].assign(self._temperature_next)
+        self.fields['salinity'].assign(self._salinity_next)

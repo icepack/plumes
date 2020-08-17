@@ -176,8 +176,8 @@ def test_momentum_transport(steady):
 
     print('Thickness/velocity convergence rate: {}, {}'.format(D_slope, u_slope))
 
-    assert D_slope > 0.5
-    assert u_slope > 0.5
+    assert D_slope > 0.25
+    assert u_slope > 0.25
 
 
 def material_transport_run(component, nx, ny):
