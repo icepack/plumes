@@ -80,8 +80,8 @@ def momentum_transport_run(steady, nx, ny):
     # Create a mesh and function spaces to represent the solution.
     mesh = firedrake.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=True)
     P = firedrake.FunctionSpace(mesh, family='CG', degree=2)
-    Q = firedrake.FunctionSpace(mesh, family='DQ', degree=1)
-    V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=1)
+    Q = firedrake.FunctionSpace(mesh, family='DQ', degree=0)
+    V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=0)
     x = firedrake.SpatialCoordinate(mesh)
 
     # Convert the sympy expressions above into UFL expressions and project them
@@ -147,7 +147,7 @@ def momentum_transport_run(steady, nx, ny):
     }
 
     final_time = 2 * 24 * 60 * 60
-    timestep = Lx / nx / (u_in + δu) / 48
+    timestep = Lx / nx / (u_in + δu) / 4
     num_steps = int(final_time / timestep)
     dt = final_time / num_steps
 
@@ -176,8 +176,8 @@ def test_momentum_transport(steady):
 
     print('Thickness/velocity convergence rate: {}, {}'.format(D_slope, u_slope))
 
-    assert D_slope > 0.25
-    assert u_slope > 0.25
+    assert D_slope > 0.75
+    assert u_slope > 0.75
 
 
 def material_transport_run(component, nx, ny):
@@ -196,8 +196,8 @@ def material_transport_run(component, nx, ny):
 
     mesh = firedrake.RectangleMesh(nx, ny, Lx, Ly, quadrilateral=True)
     P = firedrake.FunctionSpace(mesh, family='CG', degree=2)
-    Q = firedrake.FunctionSpace(mesh, family='DQ', degree=1)
-    V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=1)
+    Q = firedrake.FunctionSpace(mesh, family='DQ', degree=0)
+    V = firedrake.VectorFunctionSpace(mesh, family='DQ', degree=0)
     x = firedrake.SpatialCoordinate(mesh)
 
     D0 = firedrake.project(sympy.lambdify(X, D_sym)(x[0]), Q)
@@ -235,7 +235,7 @@ def material_transport_run(component, nx, ny):
     }
 
     final_time = 2 * 24 * 60 * 60
-    timestep = Lx / nx / (u_in + δu) / 48
+    timestep = Lx / nx / (u_in + δu) / 4
     num_steps = int(final_time / timestep)
     dt = final_time / num_steps
 
