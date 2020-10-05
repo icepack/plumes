@@ -1,2 +1,2 @@
 from .forms import *
-from .integrators import ExplicitEuler
+from .integrators import ExplicitEuler, SSPRK3

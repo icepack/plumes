@@ -1,12 +1,17 @@
+import pytest
 import numpy as np
 from numpy import pi as π
 import firedrake
-from firedrake import assemble, Constant, as_vector, inner, max_value, dx
+from firedrake import (
+    assemble, Constant, as_vector, as_tensor, inner, max_value, dx
+)
 import plumes
+from plumes import numerics
 
-def test_rotating_bump():
-    start = 32
-    finish = 2 * start
+@pytest.mark.parametrize('scheme', [numerics.ExplicitEuler, numerics.SSPRK3])
+def test_rotating_bump(scheme):
+    start = 16
+    finish = 3 * start
     incr = 4
     num_points = np.array(list(range(start, finish + incr, incr)))
     errors = np.zeros_like(num_points, dtype=np.float64)
@@ -26,36 +31,44 @@ def test_rotating_bump():
         # There are no sources
         s = Constant(0.0)
 
-        z = Constant((1/3, 1/3))
+        origin = Constant((1/2, 1/2))
+        delta = Constant((1/6, 1/6))
+        z_0 = Constant(origin - delta)
         r = Constant(1/6)
-        expr = max_value(0, 1 - inner(x - z, x - z) / r**2)
+        expr_0 = max_value(0, 1 - inner(x - z_0, x - z_0) / r**2)
 
-        final_time = 2 * π
+        θ = 4 * π / 3
         min_diameter = mesh.cell_sizes.dat.data_ro[:].min()
         max_speed = 1 / np.sqrt(2)
         # Choose a timestep that will satisfy the CFL condition
         timestep = (min_diameter / 8) / max_speed / (2 * degree + 1)
-        num_steps = int(final_time / timestep)
-        dt = final_time / num_steps
+        num_steps = int(θ / timestep)
+        dt = θ / num_steps
 
-        q_0 = firedrake.project(expr, Q)
+        q_0 = firedrake.project(expr_0, Q)
         equation = plumes.models.advection.make_equation(u, s)
-        integrator = plumes.numerics.ExplicitEuler(equation, q_0, dt)
+        integrator = scheme(equation, q_0, dt)
 
         for step in range(num_steps):
             integrator.step(dt)
 
+        # Compute the exact solution
+        R = as_tensor([[np.cos(θ), -np.sin(θ)], [np.sin(θ), np.cos(θ)]])
+        z_1 = firedrake.dot(R, z_0 - origin) + origin
+        expr_1 = max_value(0, 1 - inner(x - z_1, x - z_1) / r**2)
+
         q = integrator.state
-        errors[k] = assemble(abs(q - expr) * dx) / assemble(abs(expr) * dx)
+        errors[k] = assemble(abs(q - expr_1) * dx) / assemble(abs(expr_1) * dx)
 
     slope, intercept = np.polyfit(np.log2(1 / num_points), np.log2(errors), 1)
     print(f'log(error) ~= {slope:5.3f} * log(dx) {intercept:+5.3f}')
     assert slope > degree - 0.95
 
 
-def test_inflow_boundary():
-    start = 32
-    finish = 2 * start
+@pytest.mark.parametrize('scheme', [numerics.ExplicitEuler, numerics.SSPRK3])
+def test_inflow_boundary(scheme):
+    start = 16
+    finish = 3 * start
     incr = 4
     num_points = np.array(list(range(start, finish + incr, incr)))
     errors = np.zeros_like(num_points, dtype=np.float64)
@@ -81,7 +94,7 @@ def test_inflow_boundary():
 
         q_0 = firedrake.project(q_in - x[0], Q)
         equation = plumes.models.advection.make_equation(u, s, q_in)
-        integrator = plumes.numerics.ExplicitEuler(equation, q_0, dt)
+        integrator = scheme(equation, q_0, dt)
 
         for step in range(num_steps):
             integrator.step(dt)
