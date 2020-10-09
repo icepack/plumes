@@ -80,6 +80,60 @@ class ExplicitEuler(Integrator):
         self.state.assign(self.next_state)
 
 
+class IMEX(Integrator):
+    def __init__(
+        self,
+        equation1,
+        equation2,
+        state,
+        timestep,
+        solver_parameters=None,
+        form_compiler_parameters=None
+    ):
+        r"""A first-order implicit/explicit timestepping scheme for equations
+        with both stiff and non-stiff dynamics
+
+        Parameters
+        ----------
+        equation1
+            A Python function that takes in the state variable and returns a
+            firedrake.Form object describing the weak form of the non-stiff
+            part of the PDE, e.g. advection
+        equation2
+            Same as equation1 but for the stiff part of the PDE, e.g. friction
+        state : firedrake.Function
+            Initial state of the system
+        timestep : float
+            The initial timestep to use for the method
+        """
+        z = state.copy(deepcopy=True)
+        F = equation1(z)
+
+        z_n = z.copy(deepcopy=True)
+        G = equation2(z_n)
+
+        Z = z.function_space()
+        w = firedrake.TestFunction(Z)
+
+        dt = firedrake.Constant(timestep)
+
+        problem = Problem(inner(z_n - z, w) * dx - dt * (F + G), z_n)
+
+        if solver_parameters is None:
+            solver_parameters = _default_solver_parameters(Z)
+        solver = Solver(problem, solver_parameters=solver_parameters)
+
+        self.state = z
+        self.next_state = z_n
+        self.timestep = dt
+        self.solver = solver
+
+    def step(self, timestep):
+        self.timestep.assign(timestep)
+        self.solver.solve()
+        self.state.assign(self.next_state)
+
+
 class SSPRK33(Integrator):
     def __init__(
         self,
