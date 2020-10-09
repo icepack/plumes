@@ -1,6 +1,6 @@
 r"""Functions to calculate the weak forms of hyperbolic PDE"""
 
-from firedrake import inner, outer, avg, grad, dx, dS, FacetNormal
+from firedrake import inner, outer, avg, grad, dx, ds, dS, FacetNormal
 
 def cell_flux(F, v):
     r"""Create the weak form of the fluxes through the cell interior
@@ -71,3 +71,8 @@ def lax_friedrichs_facet_flux(s, c, v):
         A 1-form that discretizes the residual of the flux
     """
     return avg(c) * inner(s('+') - s('-'), v('+') - v('-')) * dS
+
+
+def lax_friedrichs_boundary_flux(s, s_ex, c, v, boundary_ids):
+    r"""Create the Lax-Friedrichs numerical flux through the domain boundary"""
+    return c * inner(s - s_ex, v) * ds(boundary_ids)
