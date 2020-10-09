@@ -80,7 +80,7 @@ class ExplicitEuler(Integrator):
         self.state.assign(self.next_state)
 
 
-class SSPRK3(Integrator):
+class SSPRK33(Integrator):
     def __init__(
         self,
         equation,
@@ -88,7 +88,7 @@ class SSPRK3(Integrator):
         timestep,
         solver_parameters=None
     ):
-        r"""A third-order explicit Runge-Kutta timestepping scheme"""
+        r"""A third-order, three-stage, explicit Runge-Kutta scheme"""
         z = state.copy(deepcopy=True)
         dt = firedrake.Constant(timestep)
 
@@ -110,6 +110,53 @@ class SSPRK3(Integrator):
                 inner(zs[2] - (z + 2 * zs[1]) / 3, w) * dx - 2 * dt / 3 * Fs[2], zs[2]
             )
         ]
+        solvers = [
+            Solver(problem, solver_parameters=solver_parameters)
+            for problem in problems
+        ]
+
+        self.state = z
+        self.stages = zs
+        self.timestep = dt
+        self.solvers = solvers
+
+    def step(self, timestep):
+        self.timestep.assign(timestep)
+        for solver in self.solvers:
+            solver.solve()
+        self.state.assign(self.stages[-1])
+
+
+class SSPRK34(Integrator):
+    def __init__(
+        self,
+        equation,
+        state,
+        timestep,
+        solver_parameters=None
+    ):
+        r"""A third-order, four-stage, explicit Runge-Kutta scheme"""
+        z = state.copy(deepcopy=True)
+        dt = firedrake.Constant(timestep)
+
+        num_stages = 4
+        zs = [state.copy(deepcopy=True) for stage in range(num_stages)]
+        Fs = [equation(z), equation(zs[0]), equation(zs[1]), equation(zs[2])]
+
+        Z = z.function_space()
+        if solver_parameters is None:
+            solver_parameters = _default_solver_parameters(Z)
+
+        w = firedrake.TestFunction(Z)
+
+        rhs = [
+            inner(zs[0] - z, w) * dx - dt / 2 * Fs[0],
+            inner(zs[1] - zs[0], w) * dx - dt / 2 * Fs[1],
+            inner(zs[2] - (2 * z + zs[1]) / 3, w) * dx - dt / 6 * Fs[2],
+            inner(zs[3] - zs[2], w) * dx - dt / 2 * Fs[3]
+        ]
+
+        problems = [Problem(rhs_k, z_k) for rhs_k, z_k in zip(rhs, zs)]
         solvers = [
             Solver(problem, solver_parameters=solver_parameters)
             for problem in problems

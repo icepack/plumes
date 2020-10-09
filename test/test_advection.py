@@ -8,7 +8,10 @@ from firedrake import (
 import plumes
 from plumes import numerics
 
-@pytest.mark.parametrize('scheme', [numerics.ExplicitEuler, numerics.SSPRK3])
+@pytest.mark.parametrize(
+    'scheme',
+    [numerics.ExplicitEuler, numerics.SSPRK33, numerics.SSPRK34]
+)
 def test_rotating_bump(scheme):
     start = 16
     finish = 3 * start
@@ -65,7 +68,10 @@ def test_rotating_bump(scheme):
     assert slope > degree - 0.95
 
 
-@pytest.mark.parametrize('scheme', [numerics.ExplicitEuler, numerics.SSPRK3])
+@pytest.mark.parametrize(
+    'scheme',
+    [numerics.ExplicitEuler, numerics.SSPRK33, numerics.SSPRK34]
+)
 def test_inflow_boundary(scheme):
     start = 16
     finish = 3 * start
