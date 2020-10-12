@@ -5,6 +5,8 @@ from firedrake import max_value, min_value, inner, dx, ds
 from . import forms
 
 def make_equation(u, s, q_in=firedrake.Constant(0)):
+    r"""Return a function that gives the weak form of the conservative
+    advection equation."""
     def equation(q):
         Q = q.function_space()
         φ = firedrake.TestFunction(Q)

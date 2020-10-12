@@ -41,6 +41,30 @@ def _wall_flux(z, g, boundary_ids):
 
 
 def make_equation(g, b, **kwargs):
+    r"""Return a function that calculates the weak form of the nonlinear
+    shallow water equations
+
+    Parameters
+    ----------
+    g : float, Constant or Function
+        The acceleration due to gravity
+    b : Function or expression
+        The seafloor bathymetry
+    h_in : expression, optional
+        The thickness at the inflow boundary
+    q_in : expression, optional
+        The momentum at the inflow boundary
+    inflow_ids : tuple of int, optional
+        The numeric IDS of the boundary segments where fluid is flowing in
+    outflow_ids : tuple of int, optional
+        The numeric IDs of the boundary segments where fluid is flowing out
+
+    Returns
+    -------
+    equation
+        A function that takes in an element of the mixed thickness-momentum
+        function space and returns a Form object describing the weak form
+    """
     outflow_ids = kwargs.get('outflow_ids', ())
     inflow_ids = kwargs.get('inflow_ids', ())
     h_in = kwargs.get('h_in', firedrake.Constant(0.0))

@@ -1,4 +1,12 @@
-r"""Classes for integrating models forward in time"""
+r"""Classes for integrating models forward in time
+
+Every timestepping scheme in this module takes in an argument `equation` to
+its initializer. An `equation` is a Python function that takes in the state
+variables of the system and returns a Firedrake `Form` object describing
+the spatially-discretized, weak form of the system. See the `models` sub-
+module for routines that will build these `equation` functions for you from
+the requisite input data.
+"""
 
 from abc import ABC, abstractmethod
 import firedrake
@@ -49,7 +57,7 @@ class ExplicitEuler(Integrator):
         equation
             A Python function that takes in the state variable and returns a
             firedrake.Form object describing the weak form of the PDE
-        state : firedrake.Function
+        state : Function
             The initial state of the system
         timestep : float
             The initial timestep to use for the method
@@ -142,7 +150,18 @@ class SSPRK33(Integrator):
         timestep,
         solver_parameters=None
     ):
-        r"""A third-order, three-stage, explicit Runge-Kutta scheme"""
+        r"""A third-order, three-stage, explicit Runge-Kutta scheme
+
+        Parameters
+        ----------
+        equation
+            A Python function that takes in the state variable and returns a
+            firedrake.Form object describing the weak form of the PDE
+        state : firedrake.Function
+            The initial state of the system
+        timestep : float
+            The initial timestep to use for the method
+        """
         z = state.copy(deepcopy=True)
         dt = firedrake.Constant(timestep)
 
@@ -189,7 +208,23 @@ class SSPRK34(Integrator):
         timestep,
         solver_parameters=None
     ):
-        r"""A third-order, four-stage, explicit Runge-Kutta scheme"""
+        r"""A third-order, four-stage, explicit Runge-Kutta scheme
+
+        This scheme has a larger region of absolute stability than the
+        SSPRK33 scheme; the CFL limit is 2 rather than 1. While this
+        scheme is more expensive, you can use half as many timesteps while
+        preserving stability.
+
+        Parameters
+        ----------
+        equation
+            A Python function that takes in the state variable and returns
+            a Form object describing the weak form of the PDE
+        state : Function
+            The initial state of the system
+        timestep : float
+            The initial timestep to use for the method
+        """
         z = state.copy(deepcopy=True)
         dt = firedrake.Constant(timestep)
 
