@@ -1,4 +1,4 @@
-# plumes
+# plumes [![CircleCI](https://circleci.com/gh/icepack/plumes.svg?style=svg)](https://circleci.com/gh/icepack/plumes)
 
 This package contains solvers for various models of buoyant meltwater plumes under floating ice shelves.
 The solvers are implemented using the finite element modeling package [Firedrake](https://www.firedrakeproject.org).
