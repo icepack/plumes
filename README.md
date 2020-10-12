@@ -3,6 +3,20 @@
 This package contains solvers for various models of buoyant meltwater plumes under floating ice shelves.
 The solvers are implemented using the finite element modeling package [Firedrake](https://www.firedrakeproject.org).
 
+### Code structure
+
+The library is structured roughly as follows:
+
+    plumes
+    ├── coefficients.py         # Physical constants
+    ├── numerics.py             # Time discretization schemes
+    └── models/
+        ├── forms.py            # Spatial discretization helper functions
+        ├── advection.py        # Scalar advection equation; for testing
+        └── shallow_water.py    # Nonlinear shallow water equations
+
+The directory `demo/` contains several Jupyter notebooks that show the features of this package.
+
 ### References
 
 ##### Physics
