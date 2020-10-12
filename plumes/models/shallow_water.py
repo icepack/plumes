@@ -2,7 +2,7 @@ r"""Model description for the 2D shallow water equations"""
 
 import firedrake
 from firedrake import sqrt, inner, outer, grad, dx, ds
-from ..numerics import forms
+from . import forms
 
 
 def _fluxes(h, q, g):

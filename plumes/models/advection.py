@@ -2,7 +2,7 @@ r"""Model description for the advection equation"""
 
 import firedrake
 from firedrake import max_value, min_value, inner, dx, ds
-from ..numerics import forms
+from . import forms
 
 def make_equation(u, s, q_in=firedrake.Constant(0)):
     def equation(q):
