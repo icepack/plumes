@@ -50,7 +50,15 @@ def test_rotating_bump(scheme):
 
         q_0 = firedrake.project(expr_0, Q)
         equation = plumes.models.advection.make_equation(u, s)
-        integrator = scheme(equation, q_0, dt)
+        parameters = {
+            'solver_parameters': {
+                'snes_type': 'ksponly',
+                'ksp_type': 'preonly',
+                'pc_type': 'ilu',
+                'sub_pc_type': 'bjacobi'
+            }
+        }
+        integrator = scheme(equation, q_0, dt, **parameters)
 
         for step in range(num_steps):
             integrator.step(dt)

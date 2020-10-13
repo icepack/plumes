@@ -24,7 +24,7 @@ class Integrator(ABC):
         pass
 
 
-def _default_solver_parameters(Q):
+def _solver_params(Q):
     block_parameters = {
         'ksp_type': 'preonly',
         'pc_type': 'ilu',
@@ -48,7 +48,8 @@ class ExplicitEuler(Integrator):
         equation,
         state,
         timestep,
-        solver_parameters=None
+        solver_parameters=None,
+        form_compiler_parameters=None
     ):
         r"""A first-order explicit timestepping scheme
 
@@ -63,19 +64,20 @@ class ExplicitEuler(Integrator):
             The initial timestep to use for the method
         """
         z = state.copy(deepcopy=True)
-        F = equation(z)
-
-        z_n = z.copy(deepcopy=True)
-        Z = z.function_space()
-        w = firedrake.TestFunction(Z)
-
         dt = firedrake.Constant(timestep)
 
-        problem = Problem(inner(z_n - z, w) * dx - dt * F, z_n)
+        F = equation(z)
+        z_n = z.copy(deepcopy=True)
 
-        if solver_parameters is None:
-            solver_parameters = _default_solver_parameters(Z)
-        solver = Solver(problem, solver_parameters=solver_parameters)
+        Z = z.function_space()
+        w = firedrake.TestFunction(Z)
+        form = inner(z_n - z, w) * dx - dt * F
+
+        params = {'form_compiler_parameters': form_compiler_parameters}
+        problem = Problem(form, z_n, **params)
+
+        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        solver = Solver(problem, **params)
 
         self.state = z
         self.next_state = z_n
@@ -115,21 +117,21 @@ class IMEX(Integrator):
             The initial timestep to use for the method
         """
         z = state.copy(deepcopy=True)
-        F = equation1(z)
+        dt = firedrake.Constant(timestep)
 
+        F = equation1(z)
         z_n = z.copy(deepcopy=True)
         G = equation2(z_n)
 
         Z = z.function_space()
         w = firedrake.TestFunction(Z)
+        form = inner(z_n - z, w) * dx - dt * (F + G)
 
-        dt = firedrake.Constant(timestep)
+        params = {'form_compiler_parameters': form_compiler_parameters}
+        problem = Problem(form, z_n, **params)
 
-        problem = Problem(inner(z_n - z, w) * dx - dt * (F + G), z_n)
-
-        if solver_parameters is None:
-            solver_parameters = _default_solver_parameters(Z)
-        solver = Solver(problem, solver_parameters=solver_parameters)
+        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        solver = Solver(problem, **params)
 
         self.state = z
         self.next_state = z_n
@@ -148,7 +150,8 @@ class SSPRK33(Integrator):
         equation,
         state,
         timestep,
-        solver_parameters=None
+        solver_parameters=None,
+        form_compiler_parameters=None
     ):
         r"""A third-order, three-stage, explicit Runge-Kutta scheme
 
@@ -170,23 +173,18 @@ class SSPRK33(Integrator):
         Fs = [equation(z), equation(zs[0]), equation(zs[1])]
 
         Z = z.function_space()
-        if solver_parameters is None:
-            solver_parameters = _default_solver_parameters(Z)
-
         w = firedrake.TestFunction(Z)
-        problems = [
-            Problem(inner(zs[0] - z, w) * dx - dt * Fs[0], zs[0]),
-            Problem(
-                inner(zs[1] - (3 * z + zs[0]) / 4, w) * dx - dt / 4 * Fs[1], zs[1]
-            ),
-            Problem(
-                inner(zs[2] - (z + 2 * zs[1]) / 3, w) * dx - 2 * dt / 3 * Fs[2], zs[2]
-            )
+        forms = [
+            inner(zs[0] - z, w) * dx - dt * Fs[0],
+            inner(zs[1] - (3 * z + zs[0]) / 4, w) * dx - dt / 4 * Fs[1],
+            inner(zs[2] - (z + 2 * zs[1]) / 3, w) * dx - 2 * dt / 3 * Fs[2]
         ]
-        solvers = [
-            Solver(problem, solver_parameters=solver_parameters)
-            for problem in problems
-        ]
+
+        params = {'form_compiler_parameters': form_compiler_parameters}
+        problems = [Problem(form, zk, **params) for form, zk in zip(forms, zs)]
+
+        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        solvers = [Solver(problem, **params) for problem in problems]
 
         self.state = z
         self.stages = zs
@@ -206,7 +204,8 @@ class SSPRK34(Integrator):
         equation,
         state,
         timestep,
-        solver_parameters=None
+        solver_parameters=None,
+        form_compiler_parameters=None
     ):
         r"""A third-order, four-stage, explicit Runge-Kutta scheme
 
@@ -233,23 +232,19 @@ class SSPRK34(Integrator):
         Fs = [equation(z), equation(zs[0]), equation(zs[1]), equation(zs[2])]
 
         Z = z.function_space()
-        if solver_parameters is None:
-            solver_parameters = _default_solver_parameters(Z)
-
         w = firedrake.TestFunction(Z)
-
-        rhs = [
+        forms = [
             inner(zs[0] - z, w) * dx - dt / 2 * Fs[0],
             inner(zs[1] - zs[0], w) * dx - dt / 2 * Fs[1],
             inner(zs[2] - (2 * z + zs[1]) / 3, w) * dx - dt / 6 * Fs[2],
             inner(zs[3] - zs[2], w) * dx - dt / 2 * Fs[3]
         ]
 
-        problems = [Problem(rhs_k, z_k) for rhs_k, z_k in zip(rhs, zs)]
-        solvers = [
-            Solver(problem, solver_parameters=solver_parameters)
-            for problem in problems
-        ]
+        params = {'form_compiler_parameters': form_compiler_parameters}
+        problems = [Problem(form, zk, **params) for form, zk in zip(forms, zs)]
+
+        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        solvers = [Solver(problem, **params) for problem in problems]
 
         self.state = z
         self.stages = zs
