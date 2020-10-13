@@ -17,11 +17,11 @@ def _fluxes(h, q, g):
 def _boundary_flux(z, h_ext, q_ext, g, boundary_ids):
     Z = z.function_space()
     n = firedrake.FacetNormal(Z.mesh())
-    φ, v = firedrake.TestFunctions(Z)
+    φ, v = firedrake.TestFunctions(Z)[:2]
 
     F_hx, F_qx = _fluxes(h_ext, q_ext, g)
 
-    h, q = firedrake.split(z)
+    h, q = firedrake.split(z)[:2]
     F_h, F_q = _fluxes(h, q, g)
 
     return 0.5 * (
@@ -34,7 +34,7 @@ def _boundary_flux(z, h_ext, q_ext, g, boundary_ids):
 
 def _wall_flux(z, g, boundary_ids):
     n = firedrake.FacetNormal(z.ufl_domain())
-    h, q = firedrake.split(z)
+    h, q = firedrake.split(z)[:2]
     # Mirror value of the fluid momentum
     q_ex = q - 2 * inner(q, n) * n
     return _boundary_flux(z, h, q_ex, g, boundary_ids)
@@ -55,7 +55,7 @@ def make_equation(g, b, **kwargs):
     momentum_in : expression, optional
         The momentum at the inflow boundary
     inflow_ids : tuple of int, optional
-        The numeric IDS of the boundary segments where fluid is flowing in
+        The numeric IDs of the boundary segments where fluid is flowing in
     outflow_ids : tuple of int, optional
         The numeric IDs of the boundary segments where fluid is flowing out
 
@@ -72,8 +72,8 @@ def make_equation(g, b, **kwargs):
 
     def equation(z):
         Z = z.function_space()
-        φ, v = firedrake.TestFunctions(Z)
-        h, q = firedrake.split(z)
+        φ, v = firedrake.TestFunctions(Z)[:2]
+        h, q = firedrake.split(z)[:2]
         F_h, F_q = _fluxes(h, q, g)
 
         mesh = Z.mesh()
