@@ -77,8 +77,8 @@ def test_linear_bed(scheme):
         h_0.project(h + δh * max_value(0, 1 - inner(x - y, x - y) / r**2))
 
         bcs = {
-            'h_in': h_in,
-            'q_in': as_vector((q_in, 0)),
+            'thickness_in': h_in,
+            'momentum_in': as_vector((q_in, 0)),
             'inflow_ids': (1,),
             'outflow_ids': (2,)
         }

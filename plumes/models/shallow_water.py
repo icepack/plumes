@@ -50,9 +50,9 @@ def make_equation(g, b, **kwargs):
         The acceleration due to gravity
     b : Function or expression
         The seafloor bathymetry
-    h_in : expression, optional
+    thickness_in : expression, optional
         The thickness at the inflow boundary
-    q_in : expression, optional
+    momentum_in : expression, optional
         The momentum at the inflow boundary
     inflow_ids : tuple of int, optional
         The numeric IDS of the boundary segments where fluid is flowing in
@@ -67,8 +67,8 @@ def make_equation(g, b, **kwargs):
     """
     outflow_ids = kwargs.get('outflow_ids', ())
     inflow_ids = kwargs.get('inflow_ids', ())
-    h_in = kwargs.get('h_in', firedrake.Constant(0.0))
-    q_in = kwargs.get('q_in', firedrake.Constant((0.0, 0.0)))
+    h_in = kwargs.get('thickness_in', firedrake.Constant(0.0))
+    q_in = kwargs.get('momentum_in', firedrake.Constant((0.0, 0.0)))
 
     def equation(z):
         Z = z.function_space()
