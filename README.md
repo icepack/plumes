@@ -26,6 +26,11 @@ The directory `demo/` contains several Jupyter notebooks that show the features 
 * Lazeroms et al. (2018). Modelling present-day basal melt rates for Antarctic ice shelves using a parametrization of buoyant meltwater plumes. The Cryosphere
 * Hoffman et al. (2019). Effect of Subshelf Melt Variability on Sea Level Rise Contribution From Thwaites Glacier, Antarctica. JGR Earth Surface
 
+##### Observations
+
+* Chartrand and Howat (2020). Basal channel evolution on the Getz Ice Shelf, West Antarctica. JGR Earth Surface
+* Das et al. (2020). Multidecadal Basal Melt Rates and Structure of the Ross Ice Shelf. JGR Earth Surface. (see also [the data](https://www.usap-dc.org/view/dataset/601242) on USAP website)
+
 ##### Numerics
 
 * Aizinger, Dawson (2002). A discontinuous Galerkin method for two-dimensional flow andtransport in shallow water. Advances in Water Resources
