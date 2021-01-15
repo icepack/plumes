@@ -7,12 +7,11 @@ from firedrake import (
 )
 import plumes
 from plumes.coefficients import gravity
-from plumes import numerics
+from plumes.numerics import *
 
-@pytest.mark.parametrize(
-    'scheme',
-    [numerics.ExplicitEuler, numerics.SSPRK33, numerics.SSPRK34]
-)
+schemes = [ExplicitEuler, SSPRK34, Rosenbrock]
+multipliers = {ExplicitEuler: 1/8, SSPRK34: 1/4, Rosenbrock: 1}
+@pytest.mark.parametrize('scheme', schemes)
 def test_linear_bed(scheme):
     start = 16
     finish = 2 * start
@@ -26,8 +25,8 @@ def test_linear_bed(scheme):
     for k, nx in enumerate(num_points):
         Lx, Ly = 20.0, 20.0
         mesh = firedrake.RectangleMesh(nx, nx, Lx, Ly, diagonal='crossed')
-        Q = firedrake.FunctionSpace(mesh, family='DG', degree=degree)
-        V = firedrake.VectorFunctionSpace(mesh, family='DG', degree=degree)
+        Q = firedrake.FunctionSpace(mesh, 'DG', degree)
+        V = firedrake.VectorFunctionSpace(mesh, 'DG', degree)
         Z = Q * V
 
         x = firedrake.SpatialCoordinate(mesh)
@@ -59,7 +58,8 @@ def test_linear_bed(scheme):
         c = firedrake.project(q[0] / h + sqrt(g * h), Q)
         max_speed = c.dat.data_ro[:].max()
         min_diameter = mesh.cell_sizes.dat.data_ro[:].min()
-        timestep = (min_diameter / 8) / max_speed / (2 * degree + 1)
+        multiplier = multipliers[scheme]
+        timestep = multiplier * min_diameter / max_speed / (2 * degree + 1)
 
         # Run the simulation for a full residence time of the system.
         final_time = 2 * Lx / float(u_in)

@@ -17,6 +17,9 @@ from firedrake import (
     NonlinearVariationalSolver as Solver
 )
 
+__all__ = ['ExplicitEuler', 'SSPRK33', 'SSPRK34', 'IMEX', 'Rosenbrock']
+
+
 class Integrator(ABC):
     @abstractmethod
     def step(self, timestep):
@@ -252,3 +255,38 @@ class SSPRK34(Integrator):
         for solver in self.solvers:
             solver.solve()
         self.state.assign(self.stages[-1])
+
+
+class Rosenbrock:
+    def __init__(
+        self,
+        equation,
+        state,
+        solver_parameters=None,
+        form_compiler_parameters=None
+    ):
+        r"""A first-order Rosenbrock scheme"""
+        z = state.copy(deepcopy=True)
+        dt = firedrake.Constant(1.0)
+
+        F = equation(z)
+        z_n = z.copy(deepcopy=True)
+        dF = firedrake.derivative(F, z, z_n - z)
+
+        Z = z.function_space()
+        w = firedrake.TestFunction(Z)
+
+        params = {'form_compiler_parameters': form_compiler_parameters}
+        form = inner(z_n - z, w) * dx - dt / 2 * dF - dt * F
+        problem = Problem(form, z_n, **params)
+        solver = Solver(problem, solver_parameters=solver_parameters)
+
+        self.state = z
+        self.next_state = z_n
+        self.timestep = dt
+        self.solver = solver
+
+    def step(self, timestep):
+        self.timestep.assign(timestep)
+        self.solver.solve()
+        self.state.assign(self.next_state)
