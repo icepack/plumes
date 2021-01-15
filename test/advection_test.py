@@ -6,12 +6,11 @@ from firedrake import (
     assemble, exp, Constant, as_vector, as_tensor, inner, max_value, dx
 )
 import plumes
-from plumes import numerics
+from plumes.numerics import *
 
-@pytest.mark.parametrize(
-    'scheme',
-    [numerics.ExplicitEuler, numerics.SSPRK33, numerics.SSPRK34]
-)
+schemes = [ExplicitEuler, SSPRK33, Rosenbrock]
+multipliers = {ExplicitEuler: 1/8, SSPRK33: 1/8, Rosenbrock: 1}
+@pytest.mark.parametrize('scheme', schemes)
 def test_rotating_bump(scheme):
     start = 16
     finish = 3 * start
@@ -22,7 +21,7 @@ def test_rotating_bump(scheme):
     for k, nx in enumerate(num_points):
         mesh = firedrake.PeriodicUnitSquareMesh(nx, nx, diagonal='crossed')
         degree = 1
-        Q = firedrake.FunctionSpace(mesh, family='DG', degree=degree)
+        Q = firedrake.FunctionSpace(mesh, 'DG', degree)
 
         # The velocity field is uniform solid-body rotation about the
         # center of a square
@@ -44,7 +43,8 @@ def test_rotating_bump(scheme):
         min_diameter = mesh.cell_sizes.dat.data_ro[:].min()
         max_speed = 1 / np.sqrt(2)
         # Choose a timestep that will satisfy the CFL condition
-        timestep = (min_diameter / 8) / max_speed / (2 * degree + 1)
+        multiplier = multipliers[scheme]
+        timestep = multiplier * min_diameter / max_speed / (2 * degree + 1)
         num_steps = int(θ / timestep)
         dt = θ / num_steps
 
@@ -76,10 +76,7 @@ def test_rotating_bump(scheme):
     assert slope > degree - 0.95
 
 
-@pytest.mark.parametrize(
-    'scheme',
-    [numerics.ExplicitEuler, numerics.SSPRK33, numerics.SSPRK34]
-)
+@pytest.mark.parametrize('scheme', schemes)
 def test_inflow_boundary(scheme):
     start = 16
     finish = 3 * start
@@ -90,7 +87,7 @@ def test_inflow_boundary(scheme):
     for k, nx in enumerate(num_points):
         mesh = firedrake.UnitSquareMesh(nx, nx, diagonal='crossed')
         degree = 1
-        Q = firedrake.FunctionSpace(mesh, family='DG', degree=1)
+        Q = firedrake.FunctionSpace(mesh, 'DG', 1)
 
         x = firedrake.SpatialCoordinate(mesh)
         U = Constant(1.)
@@ -102,7 +99,8 @@ def test_inflow_boundary(scheme):
         final_time = 0.5
         min_diameter = mesh.cell_sizes.dat.data_ro[:].min()
         max_speed = 1.
-        timestep = (min_diameter / 16) / max_speed / (2 * degree + 1)
+        multiplier = multipliers[scheme] / 2
+        timestep = multiplier * min_diameter / max_speed / (2 * degree + 1)
         num_steps = int(final_time / timestep)
         dt = final_time / num_steps
 
@@ -134,7 +132,7 @@ def test_imex():
     for k, nx in enumerate(num_points):
         mesh = firedrake.PeriodicUnitSquareMesh(nx, nx, diagonal='crossed')
         degree = 1
-        Q = firedrake.FunctionSpace(mesh, family='DG', degree=degree)
+        Q = firedrake.FunctionSpace(mesh, 'DG', degree)
 
         # The velocity field is uniform solid-body rotation about the
         # center of a square
@@ -168,7 +166,7 @@ def test_imex():
             φ = firedrake.TestFunction(q.function_space())
             return -λ * q * φ * dx
 
-        integrator = numerics.IMEX(advection_equation, decay_equation, q_0)
+        integrator = IMEX(advection_equation, decay_equation, q_0)
 
         for step in range(num_steps):
             integrator.step(dt)
