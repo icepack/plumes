@@ -47,7 +47,6 @@ class ExplicitEuler(Integrator):
         self,
         equation,
         state,
-        timestep,
         solver_parameters=None,
         form_compiler_parameters=None
     ):
@@ -64,7 +63,7 @@ class ExplicitEuler(Integrator):
             The initial timestep to use for the method
         """
         z = state.copy(deepcopy=True)
-        dt = firedrake.Constant(timestep)
+        dt = firedrake.Constant(1.0)
 
         F = equation(z)
         z_n = z.copy(deepcopy=True)
@@ -96,7 +95,6 @@ class IMEX(Integrator):
         equation1,
         equation2,
         state,
-        timestep,
         solver_parameters=None,
         form_compiler_parameters=None
     ):
@@ -117,7 +115,7 @@ class IMEX(Integrator):
             The initial timestep to use for the method
         """
         z = state.copy(deepcopy=True)
-        dt = firedrake.Constant(timestep)
+        dt = firedrake.Constant(1.0)
 
         F = equation1(z)
         z_n = z.copy(deepcopy=True)
@@ -149,7 +147,6 @@ class SSPRK33(Integrator):
         self,
         equation,
         state,
-        timestep,
         solver_parameters=None,
         form_compiler_parameters=None
     ):
@@ -166,7 +163,7 @@ class SSPRK33(Integrator):
             The initial timestep to use for the method
         """
         z = state.copy(deepcopy=True)
-        dt = firedrake.Constant(timestep)
+        dt = firedrake.Constant(1.0)
 
         num_stages = 3
         zs = [state.copy(deepcopy=True) for stage in range(num_stages)]
@@ -203,7 +200,6 @@ class SSPRK34(Integrator):
         self,
         equation,
         state,
-        timestep,
         solver_parameters=None,
         form_compiler_parameters=None
     ):
@@ -225,7 +221,7 @@ class SSPRK34(Integrator):
             The initial timestep to use for the method
         """
         z = state.copy(deepcopy=True)
-        dt = firedrake.Constant(timestep)
+        dt = firedrake.Constant(1.0)
 
         num_stages = 4
         zs = [state.copy(deepcopy=True) for stage in range(num_stages)]

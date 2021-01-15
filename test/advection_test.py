@@ -58,7 +58,7 @@ def test_rotating_bump(scheme):
                 'sub_pc_type': 'bjacobi'
             }
         }
-        integrator = scheme(equation, q_0, dt, **parameters)
+        integrator = scheme(equation, q_0, **parameters)
 
         for step in range(num_steps):
             integrator.step(dt)
@@ -108,7 +108,7 @@ def test_inflow_boundary(scheme):
 
         q_0 = firedrake.project(q_in - x[0], Q)
         equation = plumes.models.advection.make_equation(u, s, q_in)
-        integrator = scheme(equation, q_0, dt)
+        integrator = scheme(equation, q_0)
 
         for step in range(num_steps):
             integrator.step(dt)
@@ -168,7 +168,7 @@ def test_imex():
             φ = firedrake.TestFunction(q.function_space())
             return -λ * q * φ * dx
 
-        integrator = numerics.IMEX(advection_equation, decay_equation, q_0, dt)
+        integrator = numerics.IMEX(advection_equation, decay_equation, q_0)
 
         for step in range(num_steps):
             integrator.step(dt)
