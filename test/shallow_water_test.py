@@ -83,7 +83,7 @@ def test_linear_bed(scheme):
             'outflow_ids': (2,)
         }
         equation = plumes.models.shallow_water.make_equation(g, b, **bcs)
-        integrator = scheme(equation, z_0, dt)
+        integrator = scheme(equation, z_0)
 
         for step in range(num_steps):
             integrator.step(dt)
