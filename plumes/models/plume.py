@@ -80,7 +80,7 @@ def make_transport_equation(physics=PlumePhysics(), **kwargs):
     r"""Create the part of the plume model equations describing the transport
     of mass, momentum, heat, and salt, excluding sources and sinks
 
-    These terms are non-stiff and should be solve explicitly.
+    These terms are non-stiff and should be solved explicitly.
     """
     # Get the boundary conditions
     outflow_ids = kwargs.get('outflow_ids', ())
