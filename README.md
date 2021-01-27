@@ -13,7 +13,8 @@ The library is structured roughly as follows:
     └── models/
         ├── forms.py            # Spatial discretization helper functions
         ├── advection.py        # Scalar advection equation; for testing
-        └── shallow_water.py    # Nonlinear shallow water equations
+        ├── shallow_water.py    # Nonlinear shallow water equations
+        └── plume.py            # Shallow water + salt and heat transport
 
 The directory `demo/` contains several Jupyter notebooks that show the features of this package.
 
@@ -33,6 +34,6 @@ The directory `demo/` contains several Jupyter notebooks that show the features 
 
 ##### Numerics
 
-* Aizinger, Dawson (2002). A discontinuous Galerkin method for two-dimensional flow andtransport in shallow water. Advances in Water Resources
+* Aizinger, Dawson (2002). A discontinuous Galerkin method for two-dimensional flow and transport in shallow water. Advances in Water Resources
 * Dolejší, Feistauer (2015). *Discontinuous Galerkin Method: Analysis and Applications to Compressible Flow*. Springer
 * Wimmer et al. (2020). Energy conserving upwinded compatible finite element schemes for the rotating shallow water equations. JCP
