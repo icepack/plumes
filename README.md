@@ -25,6 +25,7 @@ The directory `demo/` contains several Jupyter notebooks that show the features 
 * Jenkins (1991). A One-Dimensional Model of Ice Shelf-Ocean Interaction. JGR
 * Jenkins et al. (2010). Observation and Parameterization of Ablation at the Base of Ronne Ice Shelf, Antarctica. JPO
 * Lazeroms et al. (2018). Modelling present-day basal melt rates for Antarctic ice shelves using a parametrization of buoyant meltwater plumes. The Cryosphere
+* Favier et al. (2019). Assessment of sub-shelf melting parameterisations using theocean–ice-sheet coupled model NEMO(v3.6)–Elmer/Ice(v8.3). GMD
 * Hoffman et al. (2019). Effect of Subshelf Melt Variability on Sea Level Rise Contribution From Thwaites Glacier, Antarctica. JGR Earth Surface
 
 ##### Observations
