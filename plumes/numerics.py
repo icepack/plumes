@@ -277,7 +277,7 @@ class Rosenbrock:
         w = firedrake.TestFunction(Z)
 
         params = {'form_compiler_parameters': form_compiler_parameters}
-        form = inner(z_n - z, w) * dx - dt / 2 * dF - dt * F
+        form = inner(z_n - z, w) * dx - dt * dF - dt * F
         problem = Problem(form, z_n, **params)
         solver = Solver(problem, solver_parameters=solver_parameters)
 
