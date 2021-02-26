@@ -94,12 +94,13 @@ def make_equation(g, b, **kwargs):
         boundary_ids = set(mesh.exterior_facets.unique_markers)
         wall_ids = tuple(boundary_ids - set(outflow_ids) - set(inflow_ids))
         q_wall = q - 2 * inner(q, n) * n
+        q_out = firedrake.max_value(0, inner(q, n)) * n
         boundary_fluxes = (
-            _boundary_flux(z, h, q, g, outflow_ids) +
+            _boundary_flux(z, h, q_out, g, outflow_ids) +
             _boundary_flux(z, h_in, q_in, g, inflow_ids) +
             _boundary_flux(z, h, q_wall, g, wall_ids) +
             forms.lax_friedrichs_boundary_flux(h, h, c, φ, outflow_ids) +
-            forms.lax_friedrichs_boundary_flux(q, q, c, v, outflow_ids) +
+            forms.lax_friedrichs_boundary_flux(q, q_out, c, v, outflow_ids) +
             forms.lax_friedrichs_boundary_flux(h, h_in, c, φ, inflow_ids) +
             forms.lax_friedrichs_boundary_flux(q, q_in, c, v, inflow_ids) +
             forms.lax_friedrichs_boundary_flux(h, h, c, φ, wall_ids) +
