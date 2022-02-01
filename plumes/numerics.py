@@ -17,7 +17,7 @@ from firedrake import (
     NonlinearVariationalSolver as Solver
 )
 
-__all__ = ['ExplicitEuler', 'SSPRK33', 'SSPRK34', 'IMEX', 'Rosenbrock']
+__all__ = ['ExplicitEuler', 'SSPRK33', 'SSPRK34', 'IMEX', 'RosenbrockMidpoint']
 
 
 class Integrator(ABC):
@@ -257,11 +257,12 @@ class SSPRK34(Integrator):
         self.state.assign(self.stages[-1])
 
 
-class Rosenbrock:
+class RosenbrockMidpoint:
     def __init__(
         self,
         equation,
         state,
+        conserved_variables=lambda z: z,
         solver_parameters=None,
         form_compiler_parameters=None
     ):
@@ -276,8 +277,11 @@ class Rosenbrock:
         Z = z.function_space()
         w = firedrake.TestFunction(Z)
 
-        params = {'form_compiler_parameters': form_compiler_parameters}
-        form = inner(z_n - z, w) * dx - dt / 2 * dF - dt * F
+        Q = inner(conserved_variables(z), w) * dx
+        dQ = firedrake.derivative(Q, z, z_n - z)
+
+        params = {"form_compiler_parameters": form_compiler_parameters}
+        form = (dQ - dt / 2 * dF) - dt * F
         problem = Problem(form, z_n, **params)
         solver = Solver(problem, solver_parameters=solver_parameters)
 

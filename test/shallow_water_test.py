@@ -9,8 +9,8 @@ import plumes
 from plumes.coefficients import gravity
 from plumes.numerics import *
 
-schemes = [ExplicitEuler, SSPRK34, Rosenbrock]
-multipliers = {ExplicitEuler: 1/8, SSPRK34: 1/4, Rosenbrock: 1}
+schemes = [ExplicitEuler, SSPRK34, RosenbrockMidpoint]
+multipliers = {ExplicitEuler: 1/8, SSPRK34: 1/4, RosenbrockMidpoint: 1}
 @pytest.mark.parametrize('scheme', schemes)
 def test_linear_bed(scheme):
     start = 16
