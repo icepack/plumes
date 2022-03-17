@@ -17,7 +17,15 @@ from firedrake import (
     NonlinearVariationalSolver as Solver
 )
 
-__all__ = ['ExplicitEuler', 'SSPRK33', 'SSPRK34', 'IMEX', 'RosenbrockMidpoint']
+__all__ = [
+    "ExplicitEuler",
+    "SSPRK33",
+    "SSPRK34",
+    "IMEX",
+    "ThetaMethod",
+    "ImplicitEuler",
+    "ImplicitMidpoint",
+]
 
 
 class Integrator(ABC):
@@ -29,20 +37,20 @@ class Integrator(ABC):
 
 def _solver_params(Q):
     block_parameters = {
-        'ksp_type': 'preonly',
-        'pc_type': 'ilu',
-        'sub_pc_type': 'bjacobi'
+        "ksp_type": "preonly",
+        "pc_type": "ilu",
+        "sub_pc_type": "bjacobi"
     }
 
-    if not hasattr(Q, 'num_sub_spaces'):
+    if not hasattr(Q, "num_sub_spaces"):
         return block_parameters
 
     fieldsplits = {
-        f'fieldsplit_{index}': block_parameters
+        f"fieldsplit_{index}": block_parameters
         for index in range(Q.num_sub_spaces())
     }
 
-    return dict(ksp_type='preonly', pc_type='fieldsplit', **fieldsplits)
+    return dict(ksp_type="preonly", pc_type="fieldsplit", **fieldsplits)
 
 
 class ExplicitEuler(Integrator):
@@ -75,10 +83,10 @@ class ExplicitEuler(Integrator):
         w = firedrake.TestFunction(Z)
         form = inner(z_n - z, w) * dx - dt * F
 
-        params = {'form_compiler_parameters': form_compiler_parameters}
+        params = {"form_compiler_parameters": form_compiler_parameters}
         problem = Problem(form, z_n, **params)
 
-        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        params = {"solver_parameters": solver_parameters or _solver_params(Z)}
         solver = Solver(problem, **params)
 
         self.state = z
@@ -128,10 +136,10 @@ class IMEX(Integrator):
         w = firedrake.TestFunction(Z)
         form = inner(z_n - z, w) * dx - dt * (F + G)
 
-        params = {'form_compiler_parameters': form_compiler_parameters}
+        params = {"form_compiler_parameters": form_compiler_parameters}
         problem = Problem(form, z_n, **params)
 
-        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        params = {"solver_parameters": solver_parameters or _solver_params(Z)}
         solver = Solver(problem, **params)
 
         self.state = z
@@ -180,10 +188,10 @@ class SSPRK33(Integrator):
             inner(zs[2] - (z + 2 * zs[1]) / 3, w) * dx - 2 * dt / 3 * Fs[2]
         ]
 
-        params = {'form_compiler_parameters': form_compiler_parameters}
+        params = {"form_compiler_parameters": form_compiler_parameters}
         problems = [Problem(form, zk, **params) for form, zk in zip(forms, zs)]
 
-        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        params = {"solver_parameters": solver_parameters or _solver_params(Z)}
         solvers = [Solver(problem, **params) for problem in problems]
 
         self.state = z
@@ -239,10 +247,10 @@ class SSPRK34(Integrator):
             inner(zs[3] - zs[2], w) * dx - dt / 2 * Fs[3]
         ]
 
-        params = {'form_compiler_parameters': form_compiler_parameters}
+        params = {"form_compiler_parameters": form_compiler_parameters}
         problems = [Problem(form, zk, **params) for form, zk in zip(forms, zs)]
 
-        params = {'solver_parameters': solver_parameters or _solver_params(Z)}
+        params = {"solver_parameters": solver_parameters or _solver_params(Z)}
         solvers = [Solver(problem, **params) for problem in problems]
 
         self.state = z
@@ -257,32 +265,38 @@ class SSPRK34(Integrator):
         self.state.assign(self.stages[-1])
 
 
-class RosenbrockMidpoint:
+class ThetaMethod:
     def __init__(
         self,
+        theta,
         equation,
         state,
         conserved_variables=lambda z: z,
         solver_parameters=None,
-        form_compiler_parameters=None
+        form_compiler_parameters=None,
     ):
-        r"""A first-order Rosenbrock scheme"""
         z = state.copy(deepcopy=True)
         dt = firedrake.Constant(1.0)
 
-        F = equation(z)
         z_n = z.copy(deepcopy=True)
-        dF = firedrake.derivative(F, z, z_n - z)
-
         Z = z.function_space()
         w = firedrake.TestFunction(Z)
 
-        Q = inner(conserved_variables(z), w) * dx
-        dQ = firedrake.derivative(Q, z, z_n - z)
+        q_n = conserved_variables(z_n)
+        q = conserved_variables(z)
 
-        params = {"form_compiler_parameters": form_compiler_parameters}
-        form = (dQ - dt / 2 * dF) - dt * F
-        problem = Problem(form, z_n, **params)
+        # The code below is a heinous dirty hack to work around the fact that
+        # we'd like to (but cannot) write
+        #
+        #     F = equation((1 - theta) * z + theta * z_n)
+        #
+        # because `(1 - theta) * z + theta * z_n` doesn't have a well-defined
+        # function space.
+        F = firedrake.replace(equation(z), {z: (1 - theta) * z + theta * z_n})
+        dQ = inner(q_n - q, w) * dx
+
+        form = dQ - dt * F
+        problem = Problem(form, z_n, form_compiler_parameters=form_compiler_parameters)
         solver = Solver(problem, solver_parameters=solver_parameters)
 
         self.state = z
@@ -294,3 +308,11 @@ class RosenbrockMidpoint:
         self.timestep.assign(timestep)
         self.solver.solve()
         self.state.assign(self.next_state)
+
+
+def ImplicitEuler(*args, **kwargs):
+    return ThetaMethod(1.0, *args, **kwargs)
+
+
+def ImplicitMidpoint(*args, **kwargs):
+    return ThetaMethod(0.5, *args, **kwargs)

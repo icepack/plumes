@@ -8,8 +8,8 @@ from firedrake import (
 import plumes
 from plumes.numerics import *
 
-schemes = [ExplicitEuler, SSPRK33, RosenbrockMidpoint]
-multipliers = {ExplicitEuler: 1/8, SSPRK33: 1/8, RosenbrockMidpoint: 1}
+schemes = [ExplicitEuler, SSPRK33, ImplicitMidpoint]
+multipliers = {ExplicitEuler: 1/8, SSPRK33: 1/8, ImplicitMidpoint: 1}
 @pytest.mark.parametrize('scheme', schemes)
 def test_rotating_bump(scheme):
     start = 16

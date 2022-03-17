@@ -6,40 +6,33 @@ from . import forms
 
 
 class MomentumForm:
-    def fluxes(self, h, q, g):
+    def fluxes(self, h, u, g):
         r"""Calculate the flux of mass and momentum for the shallow water
         equations"""
         I = firedrake.Identity(2)
-        F_h = q
-        F_q = outer(q, q) / h + 0.5 * g * h**2 * I
-        return F_h, F_q
+        F_h = u
+        F_u = outer(u, u) / h + 0.5 * g * h**2 * I
+        return F_h, F_u
 
-    def boundary_flux(self, z, h_ext, q_ext, g, boundary_ids):
+    def boundary_flux(self, z, h_ext, u_ext, g, boundary_ids):
         Z = z.function_space()
         n = firedrake.FacetNormal(Z.mesh())
         φ, v = firedrake.TestFunctions(Z)
 
-        F_hx, F_qx = self.fluxes(h_ext, q_ext, g)
+        F_hx, F_ux = self.fluxes(h_ext, u_ext, g)
 
-        h, q = firedrake.split(z)
-        F_h, F_q = self.fluxes(h, q, g)
+        h, u = firedrake.split(z)
+        F_h, F_u = self.fluxes(h, u, g)
 
         return 0.5 * (
             inner(F_hx, φ * n) +
-            inner(F_qx, outer(v, n)) +
+            inner(F_ux, outer(v, n)) +
             inner(F_h, φ * n) +
-            inner(F_q, outer(v, n))
+            inner(F_u, outer(v, n))
         ) * ds(boundary_ids)
 
-    def wall_flux(self, z, g, boundary_ids):
-        n = firedrake.FacetNormal(z.ufl_domain())
-        h, q = firedrake.split(z)
-        # Mirror value of the fluid momentum
-        q_ex = q - 2 * inner(q, n) * n
-        return _boundary_flux(z, h, q_ex, g, boundary_ids)
-
-    def wave_speed(self, h, q, g, n):
-        return abs(inner(q / h, n)) + sqrt(g * h)
+    def wave_speed(self, h, u, g, n):
+        return abs(inner(u / h, n)) + sqrt(g * h)
 
 
 class VelocityForm:
@@ -65,13 +58,6 @@ class VelocityForm:
             inner(F_h, φ * n) +
             inner(F_u, outer(v, n))
         ) * ds(boundary_ids)
-
-    def wall_flux(self, z, g, boundary_ids):
-        n = firedrake.FacetNormal(z.ufl_domain())
-        h, u = firedrake.split(z)
-        # Mirror value of the fluid momentum
-        u_ext = u - 2 * inner(u, n) * n
-        return _boundary_flux(z, h, u_ext, g, boundary_ids)
 
     def wave_speed(self, h, u, g, n):
         return abs(inner(u, n)) + sqrt(g * h)
@@ -113,20 +99,20 @@ def make_equation(g, b, form="momentum", **kwargs):
 
     if form == "momentum":
         problem_form = MomentumForm()
-        q_in = kwargs.get("momentum_in", firedrake.Constant((0.0, 0.0)))
+        u_in = kwargs.get("momentum_in", firedrake.Constant((0.0, 0.0)))
     else:
         problem_form = VelocityForm()
-        q_in = kwargs.get("velocity_in", firedrake.Constant((0.0, 0.0)))
+        u_in = kwargs.get("velocity_in", firedrake.Constant((0.0, 0.0)))
 
     def equation(z):
         Z = z.function_space()
         φ, v = firedrake.TestFunctions(Z)
-        h, q = firedrake.split(z)
-        F_h, F_q = problem_form.fluxes(h, q, g)
+        h, u = firedrake.split(z)
+        F_h, F_u = problem_form.fluxes(h, u, g)
 
         mesh = Z.mesh()
         n = firedrake.FacetNormal(mesh)
-        c = problem_form.wave_speed(h, q, g, n)
+        c = problem_form.wave_speed(h, u, g, n)
 
         sources = -inner(g * h * grad(b), v) * dx
 
@@ -134,24 +120,24 @@ def make_equation(g, b, form="momentum", **kwargs):
             forms.cell_flux(F_h, φ) +
             forms.central_facet_flux(F_h, φ) +
             forms.lax_friedrichs_facet_flux(h, c, φ) +
-            forms.cell_flux(F_q, v) +
-            forms.central_facet_flux(F_q, v) +
-            forms.lax_friedrichs_facet_flux(q, c, v)
+            forms.cell_flux(F_u, v) +
+            forms.central_facet_flux(F_u, v) +
+            forms.lax_friedrichs_facet_flux(u, c, v)
         )
 
         boundary_ids = set(mesh.exterior_facets.unique_markers)
         wall_ids = tuple(boundary_ids - set(outflow_ids) - set(inflow_ids))
-        q_wall = q - 2 * inner(q, n) * n
+        u_wall = u - 2 * inner(u, n) * n
         boundary_fluxes = (
-            problem_form.boundary_flux(z, h, q, g, outflow_ids) +
-            problem_form.boundary_flux(z, h_in, q_in, g, inflow_ids) +
-            problem_form.boundary_flux(z, h, q_wall, g, wall_ids) +
+            problem_form.boundary_flux(z, h, u, g, outflow_ids) +
+            problem_form.boundary_flux(z, h_in, u_in, g, inflow_ids) +
+            problem_form.boundary_flux(z, h, u_wall, g, wall_ids) +
             forms.lax_friedrichs_boundary_flux(h, h, c, φ, outflow_ids) +
-            forms.lax_friedrichs_boundary_flux(q, q, c, v, outflow_ids) +
+            forms.lax_friedrichs_boundary_flux(u, u, c, v, outflow_ids) +
             forms.lax_friedrichs_boundary_flux(h, h_in, c, φ, inflow_ids) +
-            forms.lax_friedrichs_boundary_flux(q, q_in, c, v, inflow_ids) +
+            forms.lax_friedrichs_boundary_flux(u, u_in, c, v, inflow_ids) +
             forms.lax_friedrichs_boundary_flux(h, h, c, φ, wall_ids) +
-            forms.lax_friedrichs_boundary_flux(q, q_wall, c, v, wall_ids)
+            forms.lax_friedrichs_boundary_flux(u, u_wall, c, v, wall_ids)
         )
 
         return sources - fluxes - boundary_fluxes

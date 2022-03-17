@@ -1,4 +1,5 @@
 import pytest
+import itertools
 import numpy as np
 from scipy.optimize import root_scalar
 import firedrake
@@ -94,8 +95,10 @@ def test_linear_bed_explicit_schemes(scheme, multiplier):
     assert slope > degree - 0.05
 
 
-@pytest.mark.parametrize("form", ["velocity", "momentum"])
-def test_linear_bed_implicit_schemes(form):
+@pytest.mark.parametrize(
+    "form, rosenbrock", itertools.product(["velocity", "momentum"], [True, False])
+)
+def test_linear_bed_implicit_schemes(form, rosenbrock):
     start = 16
     finish = 2 * start
     incr = 4
@@ -178,7 +181,16 @@ def test_linear_bed_implicit_schemes(form):
                 h, u = firedrake.split(z)
                 return firedrake.as_vector((h, h * u[0], h * u[1]))
 
-        integrator = RosenbrockMidpoint(equation, z, conserved_variables=G)
+        params = {
+            "solver_parameters": {
+                "mat_type": "aij",
+                "snes_type": "ksponly" if rosenbrock else "newtonls",
+                "ksp_type": "gmres",
+                "pc_type": "lu",
+                "pc_factor_mat_solver_type": "mumps",
+            }
+        }
+        integrator = ImplicitMidpoint(equation, z, conserved_variables=G, **params)
         for step in range(num_steps):
             integrator.step(dt)
 
@@ -189,5 +201,3 @@ def test_linear_bed_implicit_schemes(form):
     slope, intercept = np.polyfit(np.log2(1 / num_points), np.log2(errors), 1)
     print(f"log(error) ~= {slope:5.3f} * log(dx) {intercept:+5.3f}")
     assert slope > degree - 0.05
-
-
