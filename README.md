@@ -13,7 +13,8 @@ The library is structured roughly as follows:
     └── models/
         ├── forms.py            # Spatial discretization helper functions
         ├── advection.py        # Scalar advection equation; for testing
-        └── shallow_water.py    # Nonlinear shallow water equations
+        ├── shallow_water.py    # Nonlinear shallow water equations
+        └── thin_film.py        # Thin viscous film flow equations
 
 The directory `demo/` contains several Jupyter notebooks that show the features of this package.
 
