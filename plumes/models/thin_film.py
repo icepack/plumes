@@ -45,6 +45,8 @@ def make_equation(**kwargs):
         The viscosity of the fluid
     friction : Function or Constant
         The bed friction coefficient
+    friction_exponent : int
+        The nonlinearity in the friction law
     thickness_in : expression, optional
         Thickness at the inflow boundary
     velocity_in : expression, optional
@@ -63,6 +65,7 @@ def make_equation(**kwargs):
     keywords = ("gravity", "bed", "accumulation", "viscosity", "density", "friction")
     g, b, a, μ, ρ, C = map(kwargs.__getitem__, keywords)
 
+    m = kwargs.get("friction_exponent", 0)
     inflow_ids = kwargs.get("inflow_ids", ())
     outflow_ids = kwargs.get("outflow_ids", ())
     h_in = kwargs.get("thickness_in", firedrake.Constant(0.0))
@@ -82,7 +85,7 @@ def make_equation(**kwargs):
         equation_h = mass_sources - (cell_flux + boundary_flux_out + boundary_flux_in)
 
         viscosity = h * μ * (inner(ε(u), ε(v)) + tr(ε(u)) * tr(ε(v))) * dx
-        friction = C * inner(u, v) * dx
+        friction = C * inner(u, u)**(m / 2) * inner(u, v) * dx
         s = b + h
         gravity = -ρ * g * h * inner(grad(s), v) * dx
 

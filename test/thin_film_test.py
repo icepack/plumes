@@ -1,9 +1,12 @@
+import pytest
 import firedrake
 from firedrake import as_vector, Constant, inner, interpolate, dx
 import plumes
 from plumes.numerics import ImplicitEuler
 
-def test_linear_thin_film():
+
+@pytest.mark.parametrize("m", [0, 1])
+def test_linear_thin_film(m):
     Lx, Ly = 20.0, 20.0
     nx = 64
     ny = int(nx * Ly / Lx)
@@ -46,6 +49,7 @@ def test_linear_thin_film():
         accumulation=a,
         viscosity=μ,
         friction=C,
+        friction_exponent=m,
         thickness_in=h.copy(deepcopy=True),
         velocity_in=u.copy(deepcopy=True),
         inflow_ids=(1,),
@@ -81,4 +85,6 @@ def test_linear_thin_film():
         integrator.step(δt)
 
     h = integrator.state.sub(0).copy(deepcopy=True)
-    assert h.dat.data_ro[:].max() < 10.0
+    max_thickness = h.dat.data_ro[:].max()
+    print(f"Max thickness: {max_thickness}")
+    assert max_thickness < 10.0
