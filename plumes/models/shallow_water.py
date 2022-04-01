@@ -17,18 +17,16 @@ class MomentumForm:
     def boundary_flux(self, z, h_ext, u_ext, g, boundary_ids):
         Z = z.function_space()
         n = firedrake.FacetNormal(Z.mesh())
-        φ, v = firedrake.TestFunctions(Z)
+        φ, v = firedrake.TestFunctions(Z)[:2]
 
         F_hx, F_ux = self.fluxes(h_ext, u_ext, g)
 
-        h, u = firedrake.split(z)
+        h, u = firedrake.split(z)[:2]
         F_h, F_u = self.fluxes(h, u, g)
 
         return 0.5 * (
-            inner(F_hx, φ * n) +
-            inner(F_ux, outer(v, n)) +
-            inner(F_h, φ * n) +
-            inner(F_u, outer(v, n))
+            inner(F_h + F_hx, φ * n) +
+            inner(F_u + F_ux, outer(v, n))
         ) * ds(boundary_ids)
 
     def wave_speed(self, h, u, g, n):
@@ -45,18 +43,16 @@ class VelocityForm:
     def boundary_flux(self, z, h_ext, u_ext, g, boundary_ids):
         Z = z.function_space()
         n = firedrake.FacetNormal(Z.mesh())
-        φ, v = firedrake.TestFunctions(Z)
+        φ, v = firedrake.TestFunctions(Z)[:2]
 
         F_hx, F_ux = self.fluxes(h_ext, u_ext, g)
 
-        h, u = firedrake.split(z)
+        h, u = firedrake.split(z)[:2]
         F_h, F_u = self.fluxes(h, u, g)
 
         return 0.5 * (
-            inner(F_hx, φ * n) +
-            inner(F_ux, outer(v, n)) +
-            inner(F_h, φ * n) +
-            inner(F_u, outer(v, n))
+            inner(F_h + F_hx, φ * n) +
+            inner(F_u + F_ux, outer(v, n))
         ) * ds(boundary_ids)
 
     def wave_speed(self, h, u, g, n):
@@ -106,8 +102,8 @@ def make_equation(g, b, form="momentum", **kwargs):
 
     def equation(z):
         Z = z.function_space()
-        φ, v = firedrake.TestFunctions(Z)
-        h, u = firedrake.split(z)
+        φ, v = firedrake.TestFunctions(Z)[:2]
+        h, u = firedrake.split(z)[:2]
         F_h, F_u = problem_form.fluxes(h, u, g)
 
         mesh = Z.mesh()

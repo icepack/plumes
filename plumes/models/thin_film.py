@@ -74,8 +74,8 @@ def make_equation(**kwargs):
     def equation(z):
         Z = z.function_space()
         mesh = Z.mesh()
-        φ, v = firedrake.TestFunctions(Z)
-        h, u = firedrake.split(z)
+        φ, v = firedrake.TestFunctions(Z)[:2]
+        h, u = firedrake.split(z)[:2]
 
         mass_sources = a * φ * dx
         cell_flux = -h * inner(u, grad(φ)) * dx
