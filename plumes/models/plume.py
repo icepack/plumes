@@ -169,6 +169,10 @@ def make_equation(physics=PlumePhysics(), **kwargs):
             "viscosity": Constant(μ),
             "friction": Constant(k),
             "friction_exponent": 1,
+            "thickness_in": kwargs["thickness_in"],
+            "velocity_in": kwargs["velocity_in"],
+            "inflow_ids": kwargs["inflow_ids"],
+            "outflow_ids": kwargs["outflow_ids"],
         }
         hu_eqn = thin_film.make_equation(physics=physics, **thin_film_kwargs)
         return hu_eqn(z) + T_eqn(z) + S_eqn(z)
