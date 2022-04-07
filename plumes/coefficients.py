@@ -11,6 +11,9 @@ friction = 2.5e-3
 #: Acceleration due to gravity (m / s^2)
 gravity = 9.81
 
+#: Kinematic viscosity of water (m^2 / s) at 0C
+viscosity = 1.787e-6
+
 #: Effective thermohaline exchange coefficient (sqrt(k) * Γ_TS in Lazeroms)
 effective_heat_exchange = 6e-4
 

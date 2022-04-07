@@ -77,6 +77,7 @@ def make_equation(**kwargs):
         φ, v = firedrake.TestFunctions(Z)[:2]
         h, u = firedrake.split(z)[:2]
 
+        # Mass conservation
         mass_sources = a * φ * dx
         cell_flux = -h * inner(u, grad(φ)) * dx
         n = firedrake.FacetNormal(mesh)
@@ -84,12 +85,13 @@ def make_equation(**kwargs):
         boundary_flux_in = h_in * min_value(0, inner(u, n)) * φ * ds
         equation_h = mass_sources - (cell_flux + boundary_flux_out + boundary_flux_in)
 
+        # Momentum conservation, with Nitsche's method for Dirichlet BCs;
+        # see https://shapero.xyz/posts/nitsches-method/ for explanation
         viscosity = h * μ * (inner(ε(u), ε(v)) + tr(ε(u)) * tr(ε(v))) * dx
         friction = C * inner(u, u)**(m / 2) * inner(u, v) * dx
         s = b + h
         gravity = -ρ * g * h * inner(grad(s), v) * dx
 
-        # Use Nitsche's method for Dirichlet BCs
         I = firedrake.Identity(2)
         boundary_flux = μ * h * (
             inner(dot(ε(v) + tr(ε(v)) * I, n), u - u_in)
